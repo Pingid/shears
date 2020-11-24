@@ -56,7 +56,9 @@ test("Example", async () => {
               bod_html: join($("p"), html),
               image: goTo(
                 join($("a"), attr("href")),
-                join($("img"), attr("src"))
+                fork({
+                  src: join($("img"), attr("src")),
+                })
               ),
             })
           )
