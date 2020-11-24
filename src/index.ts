@@ -352,8 +352,3 @@ is.object = is<Record<any, any>>(
 is.function = is<Function>((x) => typeof x === "function");
 is.string = is<string>((x) => typeof x === "string");
 is.array = is<any[]>((x) => Array.isArray(x));
-
-export * from "./selectors";
-export * from "./utility";
-export * from "./crawl";
-export * from "./types";
