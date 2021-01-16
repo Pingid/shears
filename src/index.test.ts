@@ -5,7 +5,7 @@ import * as du from "domutils";
 
 import {
   run,
-  goTo,
+  connect,
   $,
   $$,
   join,
@@ -20,29 +20,21 @@ import {
   each,
 } from "./index";
 
-const mocNetwork = (html: string, fn?: (x: any, c: any) => void) => <T>(
-  url: string,
-  last: T
-) => {
-  if (fn) fn(url, last);
-  return TE.tryCatch(
-    () => Promise.resolve({ html, next: last }),
-    (err) => `Network error ${err && (err as any).message}`
-  );
-};
+const mocConnection = (html: string, fn?: (x: any, c: any) => void) =>
+  connect((url, ctx) => {
+    if (fn) fn(url, ctx);
+    return Promise.resolve({ markup: html, ctx });
+  });
 
 test("Example", async () => {
+  const goTo = connect((url, ctx) =>
+    Promise.resolve({
+      markup: page(url as "/" | "/one"),
+      ctx: { hostname: url },
+    })
+  );
+
   const result = await run(
-    (url) =>
-      TE.tryCatch(
-        () =>
-          Promise.resolve({
-            html: page(url as "/" | "/one"),
-            next: { hostname: url },
-          }),
-        (err) => `Network error ${err && (err as any).message}`
-      ),
-    { hostname: "" },
     goTo(
       "/",
       fork({
@@ -64,7 +56,8 @@ test("Example", async () => {
           )
         ),
       })
-    )
+    ),
+    { hostname: "" }
   )();
 
   if (isLeft(result)) throw result.left;
@@ -73,11 +66,10 @@ test("Example", async () => {
 
 it("Should return DOM AST", async () => {
   const fn = jest.fn();
-  const fetch = mocNetwork(`<h1>hello</h1>`, fn);
+  const goTo = mocConnection(`<h1>hello</h1>`, fn);
   const result = await run(
-    fetch,
-    { hostname: "http://helloworld.com" },
-    goTo("/", (r) => TE.of(r))
+    goTo("/", (r) => TE.of(r)),
+    { hostname: "http://helloworld.com" }
   )();
   if (isLeft(result)) throw result.left;
   expect(fn.mock.calls[0]).toEqual([
@@ -88,17 +80,17 @@ it("Should return DOM AST", async () => {
 });
 
 it("Should return first node matching a css selector", async () => {
-  const fetch = mocNetwork(
+  const goTo = mocConnection(
     `<div><h1>hello</h1><h2>world</h2><h2>something</h2></div>`
   );
-  const result = await run(fetch, undefined, goTo("", $("h2")))();
+  const result = await run(goTo("", $("h2")))();
   if (isLeft(result)) throw result.left;
   expect(du.isTag(result.right) && result.right.name == "h2").toBe(true);
 });
 
 it("Should return all nodes matching a css selector", async () => {
-  const fetch = mocNetwork(`<div><h1>hello</h1><h2>world</h2></div>`);
-  const result = await run(fetch, undefined, goTo("", $$("div > *")))();
+  const goTo = mocConnection(`<div><h1>hello</h1><h2>world</h2></div>`);
+  const result = await run(goTo("", $$("div > *")))();
   if (isLeft(result)) throw result.left;
   expect(result.right.length).toBe(2);
   expect(
@@ -110,14 +102,10 @@ it("Should return all nodes matching a css selector", async () => {
 });
 
 it("Should join multipe shears together", async () => {
-  const fetch = mocNetwork(
+  const goTo = mocConnection(
     `<div><ul><li><h1>foo</h1></li><li></li></ul></div>`
   );
-  const result = await run(
-    fetch,
-    undefined,
-    goTo("", join($("ul"), $("li"), $("h1")))
-  )();
+  const result = await run(goTo("", join($("ul"), $("li"), $("h1"))))();
   if (isLeft(result)) throw result.left;
   expect(du.isTag(result.right) && (result.right as any).name == "h1").toBe(
     true
@@ -125,8 +113,8 @@ it("Should join multipe shears together", async () => {
 });
 
 it("Should return parent node", async () => {
-  const fetch = mocNetwork(`<div><section><h1>foobar</h1></section></div>`);
-  const result = await run(fetch, undefined, goTo("", join($("h1"), parent)))();
+  const goTo = mocConnection(`<div><section><h1>foobar</h1></section></div>`);
+  const result = await run(goTo("", join($("h1"), parent)))();
   if (isLeft(result)) throw result.left;
   expect(
     du.isTag(result.right) && (result.right as any).name == "section"
@@ -134,12 +122,10 @@ it("Should return parent node", async () => {
 });
 
 it("Should return sibling nodes", async () => {
-  const fetch = mocNetwork(`<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`);
-  const result = await run(
-    fetch,
-    undefined,
-    goTo("", join($("h1"), siblings))
-  )();
+  const goTo = mocConnection(
+    `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`
+  );
+  const result = await run(goTo("", join($("h1"), siblings)))();
   if (isLeft(result)) throw result.left;
   expect(result.right.map((x) => (du.isTag(x) ? x.name : x.type))).toEqual([
     "h1",
@@ -149,12 +135,10 @@ it("Should return sibling nodes", async () => {
 });
 
 it("Should return next node sibling", async () => {
-  const fetch = mocNetwork(`<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`);
-  const result = await run(
-    fetch,
-    undefined,
-    goTo("", join($("h1"), nextSibling))
-  )();
+  const goTo = mocConnection(
+    `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`
+  );
+  const result = await run(goTo("", join($("h1"), nextSibling)))();
   if (isLeft(result)) throw result.left;
   expect(du.isTag(result.right) && (result.right as any).name == "h2").toBe(
     true
@@ -162,15 +146,19 @@ it("Should return next node sibling", async () => {
 });
 
 it("Should return recursively concatonate all inner text nodes", async () => {
-  const fetch = mocNetwork(`<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`);
-  const result = await run(fetch, undefined, goTo("", text))();
+  const goTo = mocConnection(
+    `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`
+  );
+  const result = await run(goTo("", text))();
   if (isLeft(result)) throw result.left;
   expect(result.right).toBe("onetwothree");
 });
 
 it("Should return serialized dom nodes", async () => {
-  const fetch = mocNetwork(`<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`);
-  const result = await run(fetch, undefined, goTo("", html))();
+  const goTo = mocConnection(
+    `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`
+  );
+  const result = await run(goTo("", html))();
   if (isLeft(result)) throw result.left;
   expect(result.right).toBe(
     "<div><h1>one</h1><h2>two</h2><h3>three</h3></div>"
@@ -178,36 +166,26 @@ it("Should return serialized dom nodes", async () => {
 });
 
 it("Should return all node attributes", async () => {
-  const fetch = mocNetwork(
+  const goTo = mocConnection(
     `<div style="background:blue" role="button">click me</div>`
   );
-  const result = await run(
-    fetch,
-    undefined,
-    goTo("", join($("div"), attributes))
-  )();
+  const result = await run(goTo("", join($("div"), attributes)))();
   if (isLeft(result)) throw result.left;
   expect(result.right).toEqual({ style: "background:blue", role: "button" });
 });
 
 it("Should return single node attribute", async () => {
-  const fetch = mocNetwork(
+  const goTo = mocConnection(
     `<div style="background:blue" role="button">click me</div>`
   );
-  const result = await run(
-    fetch,
-    undefined,
-    goTo("", join($("div"), attr("style")))
-  )();
+  const result = await run(goTo("", join($("div"), attr("style"))))();
   if (isLeft(result)) throw result.left;
   expect(result.right).toEqual("background:blue");
 });
 
 it("Should resolve object structured shears selectors", async () => {
-  const fetch = mocNetwork(`<div><h1>foo</h1><h2>bar</h2></div>`);
+  const goTo = mocConnection(`<div><h1>foo</h1><h2>bar</h2></div>`);
   const result = await run(
-    fetch,
-    undefined,
     goTo("", fork({ h1: join($("h1"), text), h2: join($("h2"), text) }))
   )();
   if (isLeft(result)) throw result.left;
@@ -215,10 +193,8 @@ it("Should resolve object structured shears selectors", async () => {
 });
 
 it("Should resolve array structured shears selectors", async () => {
-  const fetch = mocNetwork(`<div><h1>foo</h1><h2>bar</h2></div>`);
+  const goTo = mocConnection(`<div><h1>foo</h1><h2>bar</h2></div>`);
   const result = await run(
-    fetch,
-    undefined,
     goTo("", fork([join($("h1"), text), join($("h2"), text)]))
   )();
   if (isLeft(result)) throw result.left;
@@ -226,12 +202,10 @@ it("Should resolve array structured shears selectors", async () => {
 });
 
 it("Should run shears selector on array of inputs", async () => {
-  const fetch = mocNetwork(
+  const goTo = mocConnection(
     `<ul><li><h1>one</h1></li><li><h1>two</h1></li><li><h1>three</h1></li></ul>`
   );
   const result = await run(
-    fetch,
-    undefined,
     goTo("", join($$("li"), each(join($("h1"), text))))
   )();
   if (isLeft(result)) throw result.left;

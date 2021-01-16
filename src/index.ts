@@ -12,12 +12,7 @@ import * as A from "fp-ts/Array";
 
 export type Error = string;
 export type Parsed = Node | Node[];
-
-export type Get<A> = (
-  input: string,
-  next: A
-) => TE.TaskEither<Error, { data: Parsed; next: A }>;
-export type Context<R, A> = { get: Get<A>; next: A; data: R };
+export type Context<R, A = never> = { data: R; ctx: A };
 
 export type Shear<R, A, N> = RTE.ReaderTaskEither<Context<R, N>, Error, A>;
 
@@ -69,6 +64,16 @@ export const siblings = <T>(
   pipe(du.getSiblings(r.data), (x) =>
     x === null ? TE.left("Node has no parent") : TE.right(x)
   );
+
+/**
+ * Get the children of the node.
+ *
+ * @category Selector
+ * @since 1.0.0
+ */
+export const children = <T>(
+  r: Context<Node, T>
+): TE.TaskEither<string, Node[]> => pipe(du.getChildren(r.data), TE.right);
 
 /**
  * Get the next sibling lying adjecent or bellow the current node
@@ -239,7 +244,7 @@ type ForkResult<T extends Forked> = T extends Shear<any, infer D, any>
  * @param b fallback shear or value
  */
 export const each = <R extends any[], A, N>(
-  shear: Shear<R, A, N>
+  shear: Shear<R[number], A, N>
 ): Shear<R, A[], N> =>
   pipe(
     RTE.ask<Context<R, N>>(),
@@ -273,40 +278,47 @@ export const getOrElse = <A, B, C, N>(
  * @param fetch connect to network
  * @param shear selector.
  */
-export const run = <C, A>(
-  fetch: (
-    url: string,
-    last: C
-  ) => TE.TaskEither<string, { html: string; next: C }>,
-  next: C,
+export const run = <C extends any | undefined, A>(
   shear: Shear<Parsed, A, C>,
-  parser?: typeof parseDOM
+  ctx?: C
 ) =>
   shear({
-    get: (url, last) =>
-      pipe(
-        fetch(url, last),
-        TE.map((x) => ({ data: (parser || parseDOM)(x.html), next: x.next }))
-      ),
     data: [],
-    next,
+    ctx: ctx as any,
   });
 
+export const connect = <C>(
+  fetch: (url: string, ctx: C) => Promise<{ markup: string; ctx: C }>,
+  parser: typeof parseDOM = parseDOM
+) => <R, A>(
+  url: string | Shear<R, string, C>,
+  shear: Shear<Parsed, A, C>
+): Shear<R, A, C> => (r) =>
+  pipe(
+    is.function(url) && r ? url(r) : TE.of(url as string),
+    TE.chain((y) =>
+      TE.tryCatch(
+        () => fetch(y, r.ctx),
+        (error) => `${error}`
+      )
+    ),
+    TE.chain((x) => shear({ ctx: x.ctx, data: parser(x.markup) }))
+  );
 /**
  * Go to a URL and return HTML AST.
  *
  * @since 1.0.0
  * @param url Shear<string> or string url.
  */
-export const goTo = <R, A, C>(
-  url: string | Shear<R, string, C>,
-  shear: Shear<Parsed, A, C>
-): Shear<R, A, C> => (r) =>
-  pipe(
-    is.function(url) && r ? url(r) : TE.of(url as string),
-    TE.chain((y) => (!r.get ? TE.left("") : r.get(y, r?.next))),
-    TE.chain((y) => shear({ ...r, ...y }))
-  );
+// export const goTo = <R, A, C>(
+//   url: string | Shear<R, string, C>,
+//   shear: Shear<Parsed, A, C>,
+// ): Shear<R, A, C> => (r) =>
+//   pipe(
+//     is.function(url) && r ? url(r) : TE.of(url as string),
+//     TE.chain((y) => (!r.get ? TE.left("") : r.get(y, r?.next))),
+//     TE.chain((y) => shear({ ...r, ...y }))
+//   );
 
 /**
  * Paginate on a url selector stop when it fails or reaches the iteration limit
@@ -317,28 +329,28 @@ export const goTo = <R, A, C>(
  * @param limit number of times to attempt to paginate
  * @param follow selector executed on each iteration
  */
-export const paginate = <T, N>(
-  url: string | Shear<Parsed, string, N>,
-  limit: number,
-  follow: Shear<Parsed, T, N>,
-  results: T[] = []
-): Shear<Parsed, T[], N> =>
-  pipe(
-    RTE.ask<Context<Parsed, N>>(),
-    RTE.chain((y) =>
-      pipe(
-        follow(y),
-        TE.chain((x) => {
-          if (limit <= 0) return TE.right([...results, x]);
-          return TE.taskEither.alt(
-            goTo(url, paginate(url, limit - 1, follow, [...results, x]))(y),
-            () => TE.right([...results, x])
-          );
-        }),
-        (x) => RTE.fromTaskEither(x)
-      )
-    )
-  );
+// export const paginate = <T, N>(
+//   url: string | Shear<Parsed, string, N>,
+//   limit: number,
+//   follow: Shear<Parsed, T, N>,
+//   results: T[] = []
+// ): Shear<Parsed, T[], N> =>
+//   pipe(
+//     RTE.ask<Context<Parsed, N>>(),
+//     RTE.chain((y) =>
+//       pipe(
+//         follow(y),
+//         TE.chain((x) => {
+//           if (limit <= 0) return TE.right([...results, x]);
+//           return TE.taskEither.alt(
+//             goTo(url, paginate(url, limit - 1, follow, [...results, x]))(y),
+//             () => TE.right([...results, x])
+//           );
+//         }),
+//         (x) => RTE.fromTaskEither(x)
+//       )
+//     )
+//   );
 
 // -------------------------------------------------------------------------------------
 // Type guard utility
