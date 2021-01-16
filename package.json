@@ -31,5 +31,11 @@
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node"
+  },
+  "prettier": {
+    "semi": false,
+    "singleQuote": true,
+    "printWidth": 120,
+    "trailingComma": "none"
   }
 }

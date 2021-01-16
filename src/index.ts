@@ -1,20 +1,20 @@
-import { Node, Element } from "domhandler";
-import serialize from "dom-serializer";
-import { parseDOM } from "htmlparser2";
-import * as cs from "css-select";
-import * as du from "domutils";
+import { Node, Element } from 'domhandler'
+import serialize from 'dom-serializer'
+import { parseDOM } from 'htmlparser2'
+import * as cs from 'css-select'
+import * as du from 'domutils'
 
-import { sequenceS, sequenceT } from "fp-ts/Apply";
-import * as RTE from "fp-ts/ReaderTaskEither";
-import { pipe } from "fp-ts/lib/function";
-import * as TE from "fp-ts/TaskEither";
-import * as A from "fp-ts/Array";
+import { sequenceS, sequenceT } from 'fp-ts/Apply'
+import * as RTE from 'fp-ts/ReaderTaskEither'
+import { pipe } from 'fp-ts/lib/function'
+import * as TE from 'fp-ts/TaskEither'
+import * as A from 'fp-ts/Array'
 
-export type Error = string;
-export type Parsed = Node | Node[];
-export type Context<R, A = never> = { data: R; ctx: A };
+export type Error = string
+export type Parsed = Node | Node[]
+export type Context<R, A = unknown> = { data: R; ctx: A }
 
-export type Shear<R, A, N> = RTE.ReaderTaskEither<Context<R, N>, Error, A>;
+export interface Shear<R, A> extends RTE.ReaderTaskEither<Context<R>, Error, A> {}
 
 /**
  * Finds the first node to match a CSS query string.
@@ -23,12 +23,8 @@ export type Shear<R, A, N> = RTE.ReaderTaskEither<Context<R, N>, Error, A>;
  * @since 1.0.0
  * @param query CSS selector string.
  */
-export const $ = <N>(query: string): Shear<Parsed, Node, N> => <T>(
-  r: Context<Parsed, T>
-): TE.TaskEither<string, Node> =>
-  pipe(cs.selectOne(query, r.data), (y) =>
-    y ? TE.right(y) : TE.left(`Cant find node matching query ${query}`)
-  );
+export const $: (query: string) => Shear<Parsed, Node> = (query: string) => (r) =>
+  pipe(cs.selectOne(query, r.data), (y) => (y ? TE.right(y) : TE.left(`Cant find node matching query ${query}`)))
 
 /**
  * Finds all nodes matching a CSS query string.
@@ -37,9 +33,8 @@ export const $ = <N>(query: string): Shear<Parsed, Node, N> => <T>(
  * @since 1.0.0
  * @param query CSS selector string.
  */
-export const $$ = <N>(cssSelector: string) => (
-  r: Context<Parsed, N>
-): TE.TaskEither<string, Node[]> => TE.right(cs.selectAll(cssSelector, r.data));
+export const $$: (query: string) => Shear<Parsed, Node[]> = (cssSelector: string) => (r) =>
+  TE.right(cs.selectAll(cssSelector, r.data))
 
 /**
  * Get the parent node
@@ -47,10 +42,8 @@ export const $$ = <N>(cssSelector: string) => (
  * @category Selector
  * @since 1.0.0
  */
-export const parent = <T>(r: Context<Node, T>): TE.TaskEither<string, Node> =>
-  pipe(du.getParent(r.data), (x) =>
-    x === null ? TE.left("Node has no parent") : TE.right(x)
-  );
+export const parent: Shear<Node, Node> = (r) =>
+  pipe(du.getParent(r.data), (x) => (x === null ? TE.left('Node has no parent') : TE.right(x)))
 
 /**
  * Get the siblings of the node including the current node.
@@ -58,12 +51,8 @@ export const parent = <T>(r: Context<Node, T>): TE.TaskEither<string, Node> =>
  * @category Selector
  * @since 1.0.0
  */
-export const siblings = <T>(
-  r: Context<Node, T>
-): TE.TaskEither<string, Node[]> =>
-  pipe(du.getSiblings(r.data), (x) =>
-    x === null ? TE.left("Node has no parent") : TE.right(x)
-  );
+export const siblings: Shear<Node, Node[]> = (r) =>
+  pipe(du.getSiblings(r.data), (x) => (x === null ? TE.left('Node has no parent') : TE.right(x)))
 
 /**
  * Get the children of the node.
@@ -71,9 +60,7 @@ export const siblings = <T>(
  * @category Selector
  * @since 1.0.0
  */
-export const children = <T>(
-  r: Context<Node, T>
-): TE.TaskEither<string, Node[]> => pipe(du.getChildren(r.data), TE.right);
+export const children: Shear<Node, Node[]> = (r) => pipe(du.getChildren(r.data), TE.right)
 
 /**
  * Get the next sibling lying adjecent or bellow the current node
@@ -81,12 +68,8 @@ export const children = <T>(
  * @category Selector
  * @since 1.0.0
  */
-export const nextSibling = <T>(
-  r: Context<Node, T>
-): TE.TaskEither<string, Node> =>
-  pipe(du.nextElementSibling(r.data), (x) =>
-    x === null ? TE.left("Node has no parent") : TE.right(x)
-  );
+export const nextSibling: Shear<Node, Node> = (r) =>
+  pipe(du.nextElementSibling(r.data), (x) => (x === null ? TE.left('Node has no parent') : TE.right(x)))
 
 /**
  * Get the text content of the node, and its children if it has any.
@@ -94,8 +77,7 @@ export const nextSibling = <T>(
  * @category Selector
  * @since 1.0.0
  */
-export const text = <T>(r: Context<Parsed, T>): TE.TaskEither<string, string> =>
-  TE.right(du.getText(r.data));
+export const text: Shear<Parsed, string> = (r) => TE.right(du.getText(r.data))
 
 /**
  * Get the serialised html.
@@ -103,8 +85,7 @@ export const text = <T>(r: Context<Parsed, T>): TE.TaskEither<string, string> =>
  * @category Selector
  * @since 1.0.0
  */
-export const html = <T>(r: Context<Parsed, T>): TE.TaskEither<string, string> =>
-  TE.right(serialize(r.data));
+export const html: Shear<Parsed, string> = (r) => TE.right(serialize(r.data))
 
 /**
  * Get any attributes from a Node.
@@ -112,12 +93,8 @@ export const html = <T>(r: Context<Parsed, T>): TE.TaskEither<string, string> =>
  * @category Selector
  * @since 1.0.0
  */
-export const attributes = <T>(
-  r: Context<Node, T>
-): TE.TaskEither<string, { [x: string]: string }> =>
-  r.data instanceof Element
-    ? TE.right(r.data.attribs)
-    : TE.left(`No attributes exist node type ${r.data.nodeType}`);
+export const attributes: Shear<Node, { [x: string]: string }> = (r) =>
+  r.data instanceof Element ? TE.right(r.data.attribs) : TE.left(`No attributes exist node type ${r.data.nodeType}`)
 
 /**
  * Select a particular attribute from a Node.
@@ -125,21 +102,15 @@ export const attributes = <T>(
  * @category Selector
  * @since 1.0.0
  */
-export const attr = (prop: string) => <T>(r: Context<Node, T>) =>
+export const attr: (prop: string) => Shear<Node, string> = (prop) => (r) =>
   pipe(
     attributes(r),
     TE.chain((x) =>
       x[prop]
         ? TE.right(x[prop])
-        : TE.left(
-            `Attribute ${prop} doesn't exist in attributes ${JSON.stringify(
-              x,
-              null,
-              2
-            )}`
-          )
+        : TE.left(`Attribute ${prop} doesn't exist in attributes ${JSON.stringify(x, null, 2)}`)
     )
-  );
+  )
 
 /**
  * Join shears in series
@@ -155,50 +126,33 @@ export const attr = (prop: string) => <T>(r: Context<Node, T>) =>
 export const join: Join = (...[head, ...tail]: any[]) =>
   !head
     ? RTE.readerTaskEither.map(RTE.ask<Context<any, any>>(), (x) => x.data)
-    : RTE.readerTaskEither.chain(head, (x) => (y: any) =>
-        join(...(tail as [Shear<any, any, any>]))({ ...y, data: x })
-      );
+    : RTE.readerTaskEither.chain(head, (x) => (y: any) => join(...(tail as [Shear<any, any>]))({ ...y, data: x }))
 
 type Join = {
-  (): Shear<any, any, unknown>;
-  <R, A, N>(a: Shear<R, A, N>): Shear<R, A, N>;
-  <R, A, B, N>(a: Shear<R, A, N>, b: Shear<A, B, N>): Shear<R, B, N>;
-  <R, A, B, C, N>(
-    a: Shear<R, A, N>,
-    b: Shear<A, B, N>,
-    c: Shear<B, C, N>
-  ): Shear<R, C, N>;
-  <R, A, B, C, D, N>(
-    a: Shear<R, A, N>,
-    b: Shear<A, B, N>,
-    c: Shear<B, C, N>,
-    d: Shear<C, D, N>
-  ): Shear<R, D, N>;
-  <R, A, B, C, D, E, N>(
-    a: Shear<R, A, N>,
-    b: Shear<A, B, N>,
-    c: Shear<B, C, N>,
-    d: Shear<C, D, N>,
-    e: Shear<D, E, N>
-  ): Shear<E, R, N>;
-  <R, A, B, C, D, E, F, N>(
-    a: Shear<R, A, N>,
-    b: Shear<A, B, N>,
-    c: Shear<B, C, N>,
-    d: Shear<C, D, N>,
-    e: Shear<D, E, N>,
-    f: Shear<E, F, N>
-  ): Shear<R, F, N>;
-  <R, A, B, C, D, E, F, G, N>(
-    a: Shear<R, A, N>,
-    b: Shear<A, B, N>,
-    c: Shear<B, C, N>,
-    d: Shear<C, D, N>,
-    e: Shear<D, E, N>,
-    f: Shear<E, F, N>,
-    g: Shear<F, G, N>
-  ): Shear<R, G, N>;
-};
+  (): Shear<any, any>
+  <R, A>(a: Shear<R, A>): Shear<R, A>
+  <R, A, B>(a: Shear<R, A>, b: Shear<A, B>): Shear<R, B>
+  <R, A, B, C>(a: Shear<R, A>, b: Shear<A, B>, c: Shear<B, C>): Shear<R, C>
+  <R, A, B, C, D>(a: Shear<R, A>, b: Shear<A, B>, c: Shear<B, C>, d: Shear<C, D>): Shear<R, D>
+  <R, A, B, C, D, E>(a: Shear<R, A>, b: Shear<A, B>, c: Shear<B, C>, d: Shear<C, D>, e: Shear<D, E>): Shear<E, R>
+  <R, A, B, C, D, E, F>(
+    a: Shear<R, A>,
+    b: Shear<A, B>,
+    c: Shear<B, C>,
+    d: Shear<C, D>,
+    e: Shear<D, E>,
+    f: Shear<E, F>
+  ): Shear<R, F>
+  <R, A, B, C, D, E, F, G>(
+    a: Shear<R, A>,
+    b: Shear<A, B>,
+    c: Shear<B, C>,
+    d: Shear<C, D>,
+    e: Shear<D, E>,
+    f: Shear<E, F>,
+    g: Shear<F, G>
+  ): Shear<R, G>
+}
 
 /**
  * Resolves a structured shear.
@@ -210,30 +164,23 @@ type Join = {
  * @category Selector
  * @since 1.0.0
  */
-export const fork = <T extends Forked, N>(
-  fork: T
-): Shear<Parsed, ForkResult<T>, N> => {
-  if (is<Shear<any, any, N>>(is.function)(fork)) return fork;
-  if (is<Shear<any, any, N>[]>(is.array)(fork))
-    return sequenceT(RTE.readerTaskEither)(...(fork as any)) as any;
-  if (is<{ [x: string]: Forked<any> }>(is.object)(fork))
-    return sequenceS(RTE.readerTaskEither)(fork as any) as any;
-  throw new Error(`Select does not accept a selector of ${typeof fork}`);
-};
+export const fork: <T extends Forked>(fork: T) => Shear<Parsed, ForkResult<T>> = (fork) => {
+  if (is<Shear<any, any>>(is.function)(fork)) return fork
+  if (is<Shear<any, any>[]>(is.array)(fork)) return sequenceT(RTE.readerTaskEither)(...(fork as any)) as any
+  if (is<{ [x: string]: Forked<any> }>(is.object)(fork)) return sequenceS(RTE.readerTaskEither)(fork as any) as any
+  throw new Error(`Select does not accept a selector of ${typeof fork}`)
+}
 
-type Forked<T = any, R = any, N = any> =
-  | Shear<T, R, N>
-  | Shear<T, R, N>[]
-  | { [x: string]: Shear<T, R, N> };
-type ForkResult<T extends Forked> = T extends Shear<any, infer D, any>
+type Forked<T = any, R = any> = Shear<T, R> | Shear<T, R>[] | { [x: string]: Shear<T, R> }
+type ForkResult<T extends Forked> = T extends Shear<any, infer D>
   ? D
-  : T extends Shear<any, any, any>[]
+  : T extends Shear<any, any>[]
   ? {
-      [I in keyof T]: ForkResult<Extract<T[I], T[number]>>; // Extract is needed here
+      [I in keyof T]: ForkResult<Extract<T[I], T[number]>> // Extract is needed here
     }
-  : T extends { [x: string]: Shear<any, any, any> }
+  : T extends { [x: string]: Shear<any, any> }
   ? { [Key in keyof T]: ForkResult<T[Key]> }
-  : never;
+  : never
 
 /**
  * Paginate the same selector
@@ -243,17 +190,11 @@ type ForkResult<T extends Forked> = T extends Shear<any, infer D, any>
  * @param a shear.
  * @param b fallback shear or value
  */
-export const each = <R extends any[], A, N>(
-  shear: Shear<R[number], A, N>
-): Shear<R, A[], N> =>
+export const each: <R extends any[], A>(shear: Shear<R[number], A>) => Shear<R, A[]> = (shear) =>
   pipe(
-    RTE.ask<Context<R, N>>(),
-    RTE.chain((x) =>
-      A.array.traverse(RTE.readerTaskEither)(x.data, (y) => (z) =>
-        shear({ ...z, data: y })
-      )
-    )
-  );
+    RTE.ask<Context<any>>(),
+    RTE.chain((x) => A.array.traverse(RTE.readerTaskEither)(x.data, (y) => (z) => shear({ ...z, data: y })))
+  )
 
 /**
  * Paginate the same selector
@@ -263,13 +204,8 @@ export const each = <R extends any[], A, N>(
  * @param a shear.
  * @param b fallback shear or value
  */
-export const getOrElse = <A, B, C, N>(
-  a: Shear<A, B, N>,
-  b: C | Shear<A, C, N>
-) =>
-  RTE.readerTaskEither.alt<Context<A, N>, string, B | C>(a, () =>
-    is<Shear<A, C, N>>(is.function)(b) ? b : RTE.of(b)
-  );
+export const getOrElse = <A, B, C>(a: Shear<A, B>, b: C | Shear<A, C>) =>
+  RTE.readerTaskEither.alt<Context<A>, string, B | C>(a, () => (is<Shear<A, C>>(is.function)(b) ? b : RTE.of(b)))
 
 /**
  * Run a shear
@@ -278,22 +214,15 @@ export const getOrElse = <A, B, C, N>(
  * @param fetch connect to network
  * @param shear selector.
  */
-export const run = <C extends any | undefined, A>(
-  shear: Shear<Parsed, A, C>,
-  ctx?: C
-) =>
-  shear({
-    data: [],
-    ctx: ctx as any,
-  });
+export const run = <T>(shear: Shear<Parsed, T>, ctx?: unknown) => shear({ data: [], ctx })
 
-export const connect = <C>(
-  fetch: (url: string, ctx: C) => Promise<{ markup: string; ctx: C }>,
-  parser: typeof parseDOM = parseDOM
-) => <R, A>(
-  url: string | Shear<R, string, C>,
-  shear: Shear<Parsed, A, C>
-): Shear<R, A, C> => (r) =>
+export const connect: (
+  fetch: (url: string, ctx: unknown) => Promise<{ markup: string; ctx: unknown }>,
+  parser?: typeof parseDOM
+) => <R, A>(url: string | Shear<R, string>, shear: Shear<Parsed, A>) => Shear<R, A> = (fetch, parser = parseDOM) => (
+  url,
+  shear
+) => (r) =>
   pipe(
     is.function(url) && r ? url(r) : TE.of(url as string),
     TE.chain((y) =>
@@ -303,7 +232,7 @@ export const connect = <C>(
       )
     ),
     TE.chain((x) => shear({ ctx: x.ctx, data: parser(x.markup) }))
-  );
+  )
 /**
  * Go to a URL and return HTML AST.
  *
@@ -329,14 +258,14 @@ export const connect = <C>(
  * @param limit number of times to attempt to paginate
  * @param follow selector executed on each iteration
  */
-// export const paginate = <T, N>(
-//   url: string | Shear<Parsed, string, N>,
+// export const paginate = <T>(
+//   url: string | Shear<Parsed, string>,
 //   limit: number,
-//   follow: Shear<Parsed, T, N>,
+//   follow: Shear<Parsed, T>,
 //   results: T[] = []
-// ): Shear<Parsed, T[], N> =>
+// ): Shear<Parsed, T[]> =>
 //   pipe(
-//     RTE.ask<Context<Parsed, N>>(),
+//     RTE.ask<Context<Parsed>>(),
 //     RTE.chain((y) =>
 //       pipe(
 //         follow(y),
@@ -355,12 +284,8 @@ export const connect = <C>(
 // -------------------------------------------------------------------------------------
 // Type guard utility
 // -------------------------------------------------------------------------------------
-export const is = <T extends any>(fn: (x: unknown) => boolean) => (
-  x: unknown
-): x is T => fn(x);
-is.object = is<Record<any, any>>(
-  (x) => typeof x === "object" && !Array.isArray(x) && x !== null
-);
-is.function = is<Function>((x) => typeof x === "function");
-is.string = is<string>((x) => typeof x === "string");
-is.array = is<any[]>((x) => Array.isArray(x));
+export const is = <T extends any>(fn: (x: unknown) => boolean) => (x: unknown): x is T => fn(x)
+is.object = is<Record<any, any>>((x) => typeof x === 'object' && !Array.isArray(x) && x !== null)
+is.function = is<Function>((x) => typeof x === 'function')
+is.string = is<string>((x) => typeof x === 'string')
+is.array = is<any[]>((x) => Array.isArray(x))
