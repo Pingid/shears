@@ -106,9 +106,9 @@ export const attr: (prop: string) => Shear<Node, string> = (prop) => (r) =>
   pipe(
     attributes(r),
     TE.chain((x) =>
-      x[prop]
-        ? TE.right(x[prop])
-        : TE.left(`Attribute ${prop} doesn't exist in attributes ${JSON.stringify(x, null, 2)}`)
+      x[prop] === undefined
+        ? TE.left(`Attribute ${prop} doesn't exist in attributes ${JSON.stringify(x, null, 2)}`)
+        : TE.right(x[prop])
     )
   )
 
@@ -125,7 +125,7 @@ export const attr: (prop: string) => Shear<Node, string> = (prop) => (r) =>
  */
 export const join: Join = (...[head, ...tail]: any[]) =>
   !head
-    ? RTE.readerTaskEither.map(RTE.ask<Context<any, any>>(), (x) => x.data)
+    ? RTE.readerTaskEither.map(RTE.ask<Context<any>>(), (x) => x.data)
     : RTE.readerTaskEither.chain(head, (x) => (y: any) => join(...(tail as [Shear<any, any>]))({ ...y, data: x }))
 
 type Join = {
@@ -214,7 +214,8 @@ export const getOrElse = <A, B, C>(a: Shear<A, B>, b: C | Shear<A, C>) =>
  * @param fetch connect to network
  * @param shear selector.
  */
-export const run = <T>(shear: Shear<Parsed, T>, ctx?: unknown) => shear({ data: [], ctx })
+export const run = <T>(shear: Shear<Parsed, T>, markup?: string, ctx?: unknown) =>
+  shear({ data: markup !== undefined ? parseDOM(markup) : [], ctx })
 
 export const connect: (
   fetch: (url: string, ctx: unknown) => Promise<{ markup: string; ctx: unknown }>,

@@ -1,6 +1,6 @@
 {
   "name": "shears",
-  "version": "0.0.0-alpha.2",
+  "version": "0.0.0-alpha.3",
   "main": "lib/index.js",
   "license": "Public",
   "author": "Dan Beaven <dm.beaven@gmail.com>",
