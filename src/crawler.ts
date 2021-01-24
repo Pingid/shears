@@ -25,17 +25,20 @@ export const goTo: <R, A>(url: string | Shear<R, string>, shear: Shear<Node | No
       pipe(
         is.function(url) && r ? url(r) : TE.of(url as string),
         TE.chain((y) =>
-          TE.tryCatch(
-            () => fetch(y, r.connection?.ctx),
-            (err) => error(`${err}`)
+          pipe(
+            TE.tryCatch(
+              () => fetch(y, r.connection?.ctx),
+              (err) => error(`${err}`)
+            ),
+            TE.map((x) => {
+              const stack = `${r.stack} \n (${y})`
+              if (is.string(x)) return { ...r, stack, data: r.parser(x) }
+              if (is<Node>((y) => y instanceof Node)(x) || is.array(x)) return { ...r, stack, data: x }
+              return { ...r, ctx: x.ctx, stack, data: r.parser(x.markup) }
+            }),
+            TE.chain(shear)
           )
-        ),
-        TE.map((x) => {
-          if (is.string(x)) return { ...r, data: r.parser(x) }
-          if (is<Node>((y) => y instanceof Node)(x) || is.array(x)) return { ...r, data: x }
-          return { ...r, ctx: x.ctx, data: r.parser(x.markup) }
-        }),
-        TE.chain(shear)
+        )
       )
     )
   )

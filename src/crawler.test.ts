@@ -26,7 +26,7 @@ test('Example', async () => {
           $$('li'),
           each(
             fork({
-              title: getText('h4'),
+              title: getText('h9'),
               body: getText('p'),
               bod_html: join($('p'), html),
               image: goTo(
