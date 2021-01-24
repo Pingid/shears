@@ -42,13 +42,13 @@ it('Should return next node sibling', async () => {
 })
 
 it('Should return recursively concatonate all inner text nodes', async () => {
-  const result = await run(text, `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`)()
+  const result = await run(text(), `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`)()
   if (isLeft(result)) throw result.left
   expect(result.right).toBe('onetwothree')
 })
 
 it('Should return serialized dom nodes', async () => {
-  const result = await run(html, `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`)()
+  const result = await run(html(), `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`)()
   if (isLeft(result)) throw result.left
   expect(result.right).toBe('<div><h1>one</h1><h2>two</h2><h3>three</h3></div>')
 })
@@ -67,7 +67,7 @@ it('Should return single node attribute', async () => {
 
 it('Should resolve object structured shears selectors', async () => {
   const result = await run(
-    fork({ h1: join($('h1'), text), h2: join($('h2'), text) }),
+    fork({ h1: join($('h1'), text()), h2: join($('h2'), text()) }),
     `<div><h1>foo</h1><h2>bar</h2></div>`
   )()
   if (isLeft(result)) throw result.left
@@ -75,14 +75,17 @@ it('Should resolve object structured shears selectors', async () => {
 })
 
 it('Should resolve array structured shears selectors', async () => {
-  const result = await run(fork([join($('h1'), text), join($('h2'), text)]), `<div><h1>foo</h1><h2>bar</h2></div>`)()
+  const result = await run(
+    fork([join($('h1'), text()), join($('h2'), text())]),
+    `<div><h1>foo</h1><h2>bar</h2></div>`
+  )()
   if (isLeft(result)) throw result.left
   expect(result.right).toEqual(['foo', 'bar'])
 })
 
 it('Should run shears selector on array of inputs', async () => {
   const result = await run(
-    join($$('li'), each(join($('h1'), text))),
+    join($$('li'), each(join($('h1'), text()))),
     `<ul><li><h1>one</h1></li><li><h1>two</h1></li><li><h1>three</h1></li></ul>`
   )()
   if (isLeft(result)) throw result.left

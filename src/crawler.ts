@@ -1,9 +1,25 @@
 import * as RTE from 'fp-ts/ReaderTaskEither'
 import { pipe } from 'fp-ts/lib/function'
 import * as TE from 'fp-ts/TaskEither'
+import { Node } from 'domhandler'
 
-import { Node, Shear, Connection } from './shear'
+import { Shear } from './shear'
 import { is } from './utility'
+
+export interface Connection<T> {
+  readonly fetch: (url: string, ctx: T) => Promise<Node | Node[] | string | { markup: string; ctx: T }>
+  readonly ctx: T
+}
+
+/**
+ * Create network driver
+ *
+ * @since 1.0.0
+ */
+export const connect: {
+  (fetch: Connection<undefined>['fetch']): Connection<undefined>
+  <T>(fetch: Connection<T>['fetch'], ctx: T): Connection<T>
+} = (fetch: any, ctx?: any) => ({ fetch, ctx })
 
 /**
  * Go to a URL and return HTML AST.

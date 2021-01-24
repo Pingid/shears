@@ -1,12 +1,19 @@
 import serialize from 'dom-serializer'
 import { Node } from 'domhandler'
 
-import { $, attr, join, text } from './selectors'
+import { $, attr, text } from './selectors'
 import { Shear, shear } from './shear'
 import { is } from './utility'
 
-export const qt = (query: string) => shear(join($(query), text), qt)
-export const qa = (query: string, attribute: string) => shear(join($(query), attr(attribute)), qa)
+export const qt: {
+  <A>(query: string): Shear<Node | Node[], string>
+  <A>(query: string, fn: (x: string) => A): Shear<Node | Node[], A>
+} = (query: string, fn?: (x: string) => any) => shear($(query, fn ? text(fn) : text()), qt)
+
+export const qa: (query: string, attribute: string) => Shear<Node | Node[], string> = (
+  query: string,
+  attribute: string
+) => shear($(query, attr(attribute)), qa)
 
 export const debug = <A, B>(shear: Shear<A, B>): Shear<A, B> => (r) => {
   if (r.data instanceof Node) throw serialize(r.data)
