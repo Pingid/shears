@@ -2,9 +2,10 @@ import { isLeft } from 'fp-ts/lib/Either'
 import * as TE from 'fp-ts/TaskEither'
 import { parseDOM } from 'htmlparser2'
 
-import { $, $$, join, text, html, attr, fork, each } from './selectors'
-import { goTo, paginate } from './crawler'
-import { run, connect } from './shear'
+import { $, $$, join, text, html, attr, fork, each, parent } from './selectors'
+import { run, connect, shear } from './shear'
+import { debug } from './helpers'
+import { goTo } from './crawler'
 
 test('Example', async () => {
   const connection = connect(
@@ -16,7 +17,7 @@ test('Example', async () => {
     { hostname: '/' }
   )
 
-  const getText = (query: string) => join($(query), text)
+  const getText = (query: string) => shear(join($(query), text), getText)
   const result = await run(
     goTo(
       '/',
@@ -26,7 +27,8 @@ test('Example', async () => {
           $$('li'),
           each(
             fork({
-              title: getText('h9'),
+              kool: join(parent(), parent(), parent()),
+              title: getText('h4'),
               body: getText('p'),
               bod_html: join($('p'), html),
               image: goTo(

@@ -9,7 +9,7 @@ import { pipe } from 'fp-ts/lib/function'
 import * as TE from 'fp-ts/TaskEither'
 import * as A from 'fp-ts/Array'
 
-import { Context, Shear, error } from './shear'
+import { Context, Shear, shear, createErrorStack } from './shear'
 import { is } from './utility'
 
 /**
@@ -19,9 +19,11 @@ import { is } from './utility'
  * @since 1.0.0
  * @param query CSS selector string.
  */
-export const $: (query: string) => Shear<Node[] | Node, Node> = (query: string) => (r) =>
-  pipe(cs.selectOne(query, r.data), (y) =>
-    y ? TE.right(y) : TE.left(error(`Cant find node matching query ${query} ${r.stack}`))
+export const $: (query: string) => Shear<Node[] | Node, Node> = (query: string) =>
+  shear(
+    (r) => pipe(cs.selectOne(query, r.data), (y) => (y ? TE.right(y) : TE.left(void null))),
+    $,
+    `Cant find node matching query ${query}`
   )
 
 /**
@@ -40,8 +42,17 @@ export const $$: (query: string) => Shear<Node[] | Node, Node[]> = (cssSelector:
  * @category Selector
  * @since 1.0.0
  */
-export const parent: Shear<Node, Node> = (r) =>
-  pipe(du.getParent(r.data), (x) => (is.null(x) ? TE.left(error('Node has no parent')) : TE.right(x)))
+export const parent: () => Shear<Node, Node> = () =>
+  shear(
+    (r) => pipe(du.getParent(r.data), (x) => (is.null(x) ? TE.left(void null) : TE.right(x))),
+    parent,
+    'Node has no parent'
+  )
+
+// () => {
+//   const _error = createErrorStack(parent)
+//   return (r) => pipe(du.getParent(r.data), (x) => (is.null(x) ? TE.left(_error(`Node has no parent`)) : TE.right(x)))
+// }
 
 /**
  * Get node including siblings.
@@ -49,8 +60,7 @@ export const parent: Shear<Node, Node> = (r) =>
  * @category Selector
  * @since 1.0.0
  */
-export const siblings: Shear<Node, Node[]> = (r) =>
-  pipe(du.getSiblings(r.data), (x) => (is.null(x) ? TE.left(error('Node has no parent')) : TE.right(x)))
+export const siblings: () => Shear<Node, Node[]> = () => (r) => pipe(du.getSiblings(r.data), TE.right)
 
 /**
  * Get node children.
@@ -66,8 +76,12 @@ export const children: Shear<Node, Node[]> = (r) => pipe(du.getChildren(r.data),
  * @category Selector
  * @since 1.0.0
  */
-export const nextSibling: Shear<Node, Node> = (r) =>
-  pipe(du.nextElementSibling(r.data), (x) => (is.null(x) ? TE.left(error('Node has no parent')) : TE.right(x)))
+export const nextSibling: () => Shear<Node, Node> = () =>
+  shear(
+    (r) => pipe(du.nextElementSibling(r.data), (x) => (is.null(x) ? TE.left(void null) : TE.right(x))),
+    nextSibling,
+    `Node has no next sibling`
+  )
 
 /**
  * Get the text content.
@@ -91,10 +105,14 @@ export const html: Shear<Node[] | Node, string> = (r) => TE.right(serialize(r.da
  * @category Selector
  * @since 1.0.0
  */
-export const attributes: Shear<Node, { [x: string]: string }> = (r) =>
-  r.data instanceof Element
-    ? TE.right(r.data.attribs)
-    : TE.left(error(`No attributes exist node type ${r.data.nodeType}`))
+export const attributes: () => Shear<Node, { [x: string]: string }> = () =>
+  shear(
+    (r) =>
+      r.data instanceof Element
+        ? TE.right(r.data.attribs)
+        : TE.left(new Error(`No attributes exist node type ${r.data.nodeType}`)),
+    attributes
+  )
 
 /**
  * Select a particular attribute from a Node.
@@ -102,14 +120,18 @@ export const attributes: Shear<Node, { [x: string]: string }> = (r) =>
  * @category Selector
  * @since 1.0.0
  */
-export const attr: (prop: string) => Shear<Node, string> = (prop) => (r) =>
-  pipe(
-    attributes(r),
-    TE.chain((x) =>
-      x[prop] === undefined
-        ? TE.left(error(`Attribute ${prop} doesn't exist in attributes ${JSON.stringify(x, null, 2)}`))
-        : TE.right(x[prop])
-    )
+export const attr: (prop: string) => Shear<Node, string> = (prop) =>
+  shear(
+    (r) =>
+      pipe(
+        attributes()(r),
+        TE.chain((x) =>
+          x[prop] === undefined
+            ? TE.left(new Error(`Attribute ${prop} doesn't exist in attributes ${JSON.stringify(x, null, 2)}`))
+            : TE.right(x[prop])
+        )
+      ),
+    attr
   )
 
 /**
@@ -126,9 +148,7 @@ export const attr: (prop: string) => Shear<Node, string> = (prop) => (r) =>
 export const join: Join = (...[head, ...tail]: any[]) =>
   !head
     ? RTE.readerTaskEither.map(RTE.ask<Context<any>>(), (x) => x.data)
-    : RTE.readerTaskEither.chain(head, (x) => (y: any) =>
-        join(...(tail as [Shear<any, any>]))({ ...y, stack: `${y.stack} > ${head.name}`, data: x })
-      )
+    : RTE.readerTaskEither.chain(head, (x) => (y: any) => join(...(tail as [Shear<any, any>]))({ ...y, data: x }))
 
 type Join = {
   (): Shear<any, any>
@@ -166,11 +186,11 @@ type Join = {
  * @category Selector
  * @since 1.0.0
  */
-export const fork: <T extends Forked>(fork: T) => Shear<Node[] | Node, ForkResult<T>> = (fork) => {
-  if (is<Shear<any, any>>(is.function)(fork)) return fork
-  if (is<Shear<any, any>[]>(is.array)(fork)) return sequenceT(RTE.readerTaskEither)(...(fork as any)) as any
-  if (is<{ [x: string]: Forked<any> }>(is.shape)(fork)) return sequenceS(RTE.readerTaskEither)(fork as any) as any
-  throw error(`Select does not accept a selector of ${typeof fork}`)
+export const fork: <T extends Forked>(fork: T) => Shear<Node[] | Node, ForkResult<T>> = (_fork) => {
+  if (is<Shear<any, any>>(is.function)(_fork)) return _fork
+  if (is<Shear<any, any>[]>(is.array)(_fork)) return sequenceT(RTE.readerTaskEither)(...(_fork as any)) as any
+  if (is<{ [x: string]: Forked<any> }>(is.shape)(_fork)) return sequenceS(RTE.readerTaskEither)(_fork as any) as any
+  throw createErrorStack(fork)(`Select does not accept a selector of ${typeof _fork}`)
 }
 
 type Forked<T = any, R = any> = Shear<T, R> | ReadonlyArray<Shear<T, R>> | { [x: string]: Shear<T, R> }
@@ -190,10 +210,10 @@ type ForkResult<T extends Forked> = T extends Shear<any, infer D>
  * @param a shear.
  * @param b fallback shear or value
  */
-export const each: <R extends any[], A>(shear: Shear<R[number], A>) => Shear<R, A[]> = (shear) =>
+export const each: <R extends any[], A>(shear: Shear<R[number], A>) => Shear<R, A[]> = (_shear) =>
   pipe(
     RTE.ask<Context<any>>(),
-    RTE.chain((x) => A.array.traverse(RTE.readerTaskEither)(x.data, (y) => (z) => shear({ ...z, data: y })))
+    RTE.chain((x) => A.array.traverse(RTE.readerTaskEither)(x.data, (y) => (z) => _shear({ ...z, data: y })))
   )
 
 /**

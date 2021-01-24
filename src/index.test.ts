@@ -24,19 +24,19 @@ it('Should join multipe shears together', async () => {
 })
 
 it('Should return parent node', async () => {
-  const result = await run(join($('h1'), parent), `<div><section><h1>foobar</h1></section></div>`)()
+  const result = await run(join($('h1'), parent()), `<div><section><h1>foobar</h1></section></div>`)()
   if (isLeft(result)) throw result.left
   expect(du.isTag(result.right) && (result.right as any).name == 'section').toBe(true)
 })
 
 it('Should return sibling nodes', async () => {
-  const result = await run(join($('h1'), siblings), `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`)()
+  const result = await run(join($('h1'), siblings()), `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`)()
   if (isLeft(result)) throw result.left
   expect(result.right.map((x) => (du.isTag(x) ? x.name : x.type))).toEqual(['h1', 'h2', 'h3'])
 })
 
 it('Should return next node sibling', async () => {
-  const result = await run(join($('h1'), nextSibling), `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`)()
+  const result = await run(join($('h1'), nextSibling()), `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`)()
   if (isLeft(result)) throw result.left
   expect(du.isTag(result.right) && (result.right as any).name == 'h2').toBe(true)
 })
@@ -54,7 +54,7 @@ it('Should return serialized dom nodes', async () => {
 })
 
 it('Should return all node attributes', async () => {
-  const result = await run(join($('div'), attributes), `<div style="background:blue" role="button">click me</div>`)()
+  const result = await run(join($('div'), attributes()), `<div style="background:blue" role="button">click me</div>`)()
   if (isLeft(result)) throw result.left
   expect(result.right).toEqual({ style: 'background:blue', role: 'button' })
 })

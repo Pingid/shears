@@ -1,9 +1,15 @@
-import * as RTE from 'fp-ts/ReaderTaskEither'
-import { flow } from 'fp-ts/lib/function'
-import * as du from 'domutils'
+import serialize from 'dom-serializer'
+import { Node } from 'domhandler'
 
 import { $, attr, join, text } from './selectors'
-import { Context } from './shear'
+import { Shear, shear } from './shear'
+import { is } from './utility'
 
-export const qt = flow((query: string) => join($(query), text))
-export const qa = flow((query: string, attribute: string) => join($(query), attr(attribute)))
+export const qt = (query: string) => shear(join($(query), text), qt)
+export const qa = (query: string, attribute: string) => shear(join($(query), attr(attribute)), qa)
+
+export const debug = <A, B>(shear: Shear<A, B>): Shear<A, B> => (r) => {
+  if (r.data instanceof Node) throw serialize(r.data)
+  if (is.array(r.data) && r.data[0] instanceof Node) throw serialize(r.data)
+  return shear(r)
+}

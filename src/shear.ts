@@ -6,7 +6,47 @@ import { TaskEither } from 'fp-ts/TaskEither'
 
 export class Node extends DH.Node {}
 
-export type _Error = Error
+class _Error extends Error {
+  constructor(message?: string, fn?: Function) {
+    super(message)
+    Error.captureStackTrace(this, fn)
+  }
+}
+export const createErrorStack = (fn?: Function) => {
+  const error = new _Error('', fn || createErrorStack)
+  return (message?: string) => {
+    error.message = message || error.message
+    return error
+  }
+}
+
+export const createErrorStackMap = (fn?: Function, message?: string) => {
+  const stackError = new _Error(message, fn || createErrorStack)
+  return (_error?: Error | string) => {
+    if (typeof _error === 'string') {
+      const err = new Error(_error)
+      err.stack = stackError.stack
+      return err
+    }
+    if (_error instanceof Error) {
+      _error.stack = stackError.stack
+      return _error
+    }
+    return stackError
+  }
+}
+
+export const shear: <R, A>(
+  fn: RTE.ReaderTaskEither<Context<R>, string | undefined | Error, A>,
+  _fn?: Function,
+  message?: string
+) => Shear<R, A> = (fn, ref, message) => {
+  const _error = createErrorStackMap(ref || shear, message)
+  return RTE.readerTaskEither.mapLeft(fn, _error)
+}
+
+export const createShear = <A extends any[], R, B>(fn: (...args: A) => Shear<R, B>, ref: Function) => (...args: A) =>
+  shear(fn(...args), ref)
 
 export interface Connection<T> {
   readonly fetch: (url: string, ctx: T) => Promise<Node | Node[] | string | { markup: string; ctx: T }>
@@ -17,12 +57,9 @@ export type Context<R, A = unknown> = {
   data: R
   parser: typeof parseDOM
   connection?: Connection<A>
-  stack: string
 }
 
 export interface Shear<R, A> extends RTE.ReaderTaskEither<Context<R>, _Error, A> {}
-
-export const error = (message: string) => new Error(message)
 
 /**
  * Run a shear
@@ -38,8 +75,7 @@ export const run: <T>(
   shear({
     data: context?.data || (markup !== undefined ? (context?.parser || parseDOM)(markup) : []),
     parser: context?.parser || parseDOM,
-    connection: context?.connection,
-    stack: `${shear.name}`
+    connection: context?.connection
   })
 
 /**
@@ -53,5 +89,5 @@ export const connect: {
 } = (fetch: any, ctx?: any) => ({ fetch, ctx })
 
 export const ask = RTE.ask<Context<Node | Node[]>>()
-export const map = RTE.map
+export const map = RTE.readerTaskEither.map
 export const chain = RTE.chain
