@@ -2,7 +2,7 @@ import * as RTE from 'fp-ts/ReaderTaskEither'
 import { pipe } from 'fp-ts/lib/function'
 import * as TE from 'fp-ts/TaskEither'
 
-import { Node, Shear, error, _Error, Connection } from './shear'
+import { Node, Shear, Connection } from './shear'
 import { is } from './utility'
 
 /**
@@ -19,8 +19,8 @@ export const goTo: <R, A>(url: string | Shear<R, string>, shear: Shear<Node | No
     r.connection,
     (connecton) =>
       is<Connection<any>>((x) => x !== undefined)(connecton)
-        ? TE.right<_Error, Connection<unknown>>(connecton)
-        : TE.left(error('Must provide a connection object')),
+        ? TE.right<Error, Connection<unknown>>(connecton)
+        : TE.left(new Error('Must provide a connection object')),
     TE.chain(({ fetch }) =>
       pipe(
         is.function(url) && r ? url(r) : TE.of(url as string),
@@ -28,13 +28,12 @@ export const goTo: <R, A>(url: string | Shear<R, string>, shear: Shear<Node | No
           pipe(
             TE.tryCatch(
               () => fetch(y, r.connection?.ctx),
-              (err) => error(`${err}`)
+              (err) => new Error(`${err}`)
             ),
             TE.map((x) => {
-              const stack = `${r.stack} \n (${y})`
-              if (is.string(x)) return { ...r, stack, data: r.parser(x) }
-              if (is<Node>((y) => y instanceof Node)(x) || is.array(x)) return { ...r, stack, data: x }
-              return { ...r, ctx: x.ctx, stack, data: r.parser(x.markup) }
+              if (is.string(x)) return { ...r, data: r.parser(x) }
+              if (is<Node>((y) => y instanceof Node)(x) || is.array(x)) return { ...r, data: x }
+              return { ...r, ctx: x.ctx, data: r.parser(x.markup) }
             }),
             TE.chain(shear)
           )
