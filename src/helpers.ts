@@ -10,6 +10,6 @@ export const qa = (query: string, attribute: string) => shear(join($(query), att
 
 export const debug = <A, B>(shear: Shear<A, B>): Shear<A, B> => (r) => {
   if (r.data instanceof Node) throw serialize(r.data)
-  if (is.array(r.data) && r.data[0] instanceof Node) throw serialize(r.data)
+  if (is.array(r.data) && r.data[0] instanceof Node) throw serialize((r.data as any) as Node)
   return shear(r)
 }
