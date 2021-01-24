@@ -10,7 +10,8 @@
     "test": "jest",
     "prettier": "prettier --write \"src/**/*.{js,jsx,ts,tsx}\"",
     "clean": "rm tsconfig.tsbuildinfo || true && rm -R ./lib || true",
-    "postversion": "git push --tags"
+    "postversion": "git push --tags",
+    "postinstall": "yarn build"
   },
   "dependencies": {
     "css-select": "^2.1.0",
