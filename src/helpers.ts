@@ -4,9 +4,10 @@ import { Node } from 'domhandler'
 import * as RTE from 'fp-ts/ReaderTaskEither'
 import { pipe } from 'fp-ts/pipeable'
 
+import { attributes, text } from './selectors/domUtils'
 import { createErrorStackMap } from './error'
-import { $, attr, text } from './selectors'
 import { Shear } from './shear'
+import { $ } from './selectors'
 import { is } from './utility'
 
 /**
@@ -50,7 +51,7 @@ export const qt = queryText
 export const queryAttribute: (query: string, attribute: string) => Shear<Node | Node[], string> = (
   query: string,
   attribute: string
-) => createShear($(query, attr(attribute)), queryAttribute)
+) => createShear($(query, attributes(attribute)), queryAttribute)
 
 export const qa = queryAttribute
 

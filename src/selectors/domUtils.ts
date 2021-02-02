@@ -1,6 +1,5 @@
 import serialize, { DomSerializerOptions } from 'dom-serializer'
 import { Node, Element } from 'domhandler'
-import * as cs from 'css-select'
 import * as du from 'domutils'
 
 import { fromNullable } from 'fp-ts/lib/Either'
@@ -9,66 +8,33 @@ import * as RTE from 'fp-ts/ReaderTaskEither'
 import * as TE from 'fp-ts/TaskEither'
 import * as A from 'fp-ts/Array'
 
-import { Context, Shear } from './shear'
-import { QueryError } from './error'
+import { Context, Shear } from '../shear'
+import { QueryError } from '../error'
+import { is } from '../utility'
 
 /**
- * Finds the first node to match a CSS query string.
+ * Get first element
  *
  * @category Selector
  * @since 1.0.0
- * @param {string} query - CSS selector query
- * @param {Shear} next - Shear selector handed selectod node
  */
-export const query: {
-  (query: string): Shear<Node[] | Node, Node>
-  <A>(query: string, next: Shear<Node, A>): Shear<Node[] | Node, A>
-} = (query: string, next?: Shear<Node, any>) =>
-  pipe(new QueryError(`Failed to find node: (${query})`, $), (error) =>
+export const first: {
+  (): Shear<Node | Node[], Node>
+  <A>(_shear: Shear<Node, A>): Shear<Node | Node[], A>
+} = (_shear?: Shear<Node, any>) =>
+  pipe(new QueryError(`No elements found`, first), (error) =>
     pipe(
       RTE.ask<Context<Node | Node[]>>(),
       RTE.chain((r) => () =>
         pipe(
-          cs.selectOne(query, r.data),
+          is.array(r.data) ? r.data[0] : r.data,
           fromNullable(error),
           TE.fromEither,
-          TE.chain((data) => (next ? next({ ...r, data }) : TE.right(data)))
+          TE.chain((data) => (_shear ? _shear({ ...r, data }) : TE.right(data)))
         )
       )
     )
   )
-
-/**
- * Finds the first node to match a CSS query string.
- *
- * @category Selector
- * @since 1.0.0
- * @alias query
- * @param {string} query - CSS selector query
- * @param {Shear} next - Shear selector handed selectod node
- */
-export const $ = query
-
-/**
- * Finds all nodes matching a CSS query string.
- *
- * @category Selector
- * @since 1.0.0
- * @param query CSS selector string.
- */
-export const queryAll: {
-  (query: string): Shear<Node[] | Node, Node[]>
-  <A>(query: string, _shear: Shear<Node, A>): Shear<Node[] | Node, A[]>
-} = (query: string, _shear?: Shear<Node, any>) =>
-  pipe(
-    RTE.ask<Context<Node | Node[]>>(),
-    RTE.chain((r) => () =>
-      pipe(cs.selectAll(query, r.data), (data) =>
-        _shear ? A.array.traverse(TE.taskEither)(data, (data) => _shear({ ...r, data })) : TE.right<Error, Node[]>(data)
-      )
-    )
-  )
-export const $$ = queryAll
 
 /**
  * Get node parent.
@@ -184,16 +150,29 @@ export const html: (options?: DomSerializerOptions) => Shear<Node[] | Node, stri
   )
 
 /**
- * Get any attributes from on a Node.
+ * Select a particular attribute from a Node.
  *
  * @category Selector
  * @since 1.0.0
  */
-export const attributes: () => Shear<Node, { [x: string]: string }> = () =>
-  pipe(new QueryError(`No attributes exist node`, attributes), (error) =>
+export const attributes: {
+  (): Shear<Node, string>
+  (prop: string): Shear<Node, string>
+  <T>(prop: (x: { [x: string]: string }) => T): Shear<Node, T>
+} = (prop?: string | ((x: { [x: string]: string }) => any)) =>
+  pipe(new QueryError(`Node doesn't have attribute (${prop})`, attributes), (error) =>
     pipe(
       RTE.ask<Context<Node>>(),
-      RTE.chain((r) => () => (r.data instanceof Element ? TE.right(r.data.attribs) : TE.left(error)))
+      RTE.chain((r) => () =>
+        pipe(
+          r.data instanceof Element ? TE.right(r.data.attribs) : TE.left<QueryError, never>(error),
+          TE.chain((y) => {
+            if (is.falsy(prop)) return TE.right(y)
+            if (is.string(prop)) return y[prop] === undefined ? TE.left(error) : TE.right(y[prop])
+            return TE.right(prop(y))
+          })
+        )
+      )
     )
   )
 
@@ -203,15 +182,4 @@ export const attributes: () => Shear<Node, { [x: string]: string }> = () =>
  * @category Selector
  * @since 1.0.0
  */
-export const attr: (prop: string) => Shear<Node, string> = (prop) =>
-  pipe(new QueryError(`Node doesn't have attribute (${prop})`, attr), (error) =>
-    pipe(
-      RTE.ask<Context<Node>>(),
-      RTE.chain((r) => () =>
-        pipe(
-          attributes()(r),
-          TE.chain((x) => (x[prop] === undefined ? TE.left(error) : TE.right(x[prop])))
-        )
-      )
-    )
-  )
+export const attr = attributes

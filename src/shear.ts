@@ -123,9 +123,9 @@ export const each: <R extends any[], A>(shear: Shear<R[number], A>) => Shear<R, 
  * @param a shear.
  * @param b fallback shear or value
  */
-// RTE.ReaderTaskEither<Context<A, unknown>, string, B | C>
 export const getOrElse: <A, B, C>(a: Shear<A, B>, b: C | Shear<A, C>) => Shear<A, B | C> = (a, b) =>
   RTE.readerTaskEither.alt(a, () => (is<Shear<any, any>>(is.function)(b) ? b : RTE.of(b)))
 
-export const nullable: <A, B>(a: Shear<A, B>) => Shear<A, B | null> = (a) =>
-  RTE.readerTaskEither.alt(a, () => RTE.right(null))
+export const nullable: {
+  <A, B>(a: Shear<A, B>): Shear<A, B | null>
+} = (a) => RTE.readerTaskEither.alt(a, () => RTE.right(null))
