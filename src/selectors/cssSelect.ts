@@ -9,6 +9,7 @@ import * as A from 'fp-ts/Array'
 
 import { Context, Shear } from '../shear'
 import { QueryError } from '../error'
+import { is } from '../utility'
 
 /**
  * Finds the first node to match a CSS query string.
@@ -62,7 +63,9 @@ export const queryAll: {
     RTE.ask<Context<Node | Node[]>>(),
     RTE.chain((r) => () =>
       pipe(cs.selectAll(query, r.data), (data) =>
-        _shear ? A.array.traverse(TE.taskEither)(data, (data) => _shear({ ...r, data })) : TE.right<Error, Node[]>(data)
+        !is.falsy(_shear)
+          ? A.array.traverse(TE.taskEither)(data, (data) => _shear({ ...r, data }))
+          : TE.right<Error, Node[]>(data)
       )
     )
   )

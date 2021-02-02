@@ -109,9 +109,9 @@ type ForkResult<T extends Forked> = T extends Shear<any, infer D>
  * @param a shear.
  * @param b fallback shear or value
  */
-export const each: <R extends any[], A>(shear: Shear<R[number], A>) => Shear<R, A[]> = (_shear) =>
+export const each: <R, A>(shear: Shear<R, A>) => Shear<R[], A[]> = (_shear) =>
   pipe(
-    RTE.ask<Context<any>>(),
+    RTE.ask<Context<any[]>>(),
     RTE.chain((x) => A.array.traverse(RTE.readerTaskEither)(x.data, (y) => (z) => _shear({ ...z, data: y })))
   )
 
