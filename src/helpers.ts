@@ -61,9 +61,9 @@ export const qa = queryAttribute
  * @since 1.0.0
  * @param query CSS selector string.
  */
-export const debug = <A, B>(): Shear<A, B> => (r) => {
+export const debug = (): Shear<unknown, void> => (r) => {
   const data = r.data
-  if (is<Node>((x) => x instanceof Node)(data)) throw serialize(data)
-  if (is<Node[]>((x) => is.array(x) && x[0] instanceof Node)(data)) throw serialize(data)
+  if (is<Node>((x) => x instanceof Node)(data)) throw serialize(data as any)
+  if (is<Node[]>((x) => is.array(x) && x[0] instanceof Node)(data)) throw serialize(data as any)
   throw JSON.stringify(data)
 }
