@@ -4,10 +4,9 @@ import { Node } from 'domhandler'
 import * as RTE from 'fp-ts/ReaderTaskEither'
 import { pipe } from 'fp-ts/pipeable'
 
-import { attributes, text } from './selectors/domUtils'
+import { $, attributes, text } from './selectors'
 import { createErrorStackMap } from './error'
 import { Shear } from './shear'
-import { $ } from './selectors'
 import { is } from './utility'
 
 /**
