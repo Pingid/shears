@@ -26,14 +26,15 @@ export interface Shear<R, A> extends RTE.ReaderTaskEither<Context<R>, Error, A> 
  */
 export const run: <T>(
   shear: Shear<Node | Node[], T>,
-  markup?: string,
-  context?: Partial<Context<Node | Node[], any>>
-) => TaskEither<Error, T> = (shear, markup, context) =>
-  shear({
-    data: context?.data || (markup !== undefined ? (context?.parser || parseDOM)(markup) : []),
-    parser: context?.parser || parseDOM,
-    connection: context?.connection
+  markupOrContext?: string | Partial<Context<Node | Node[], any>>
+) => TaskEither<Error, T> = (shear, markupOrContext) => {
+  if (is.string(markupOrContext)) return shear({ data: parseDOM(markupOrContext), parser: parseDOM })
+  return shear({
+    data: markupOrContext?.data || [],
+    parser: markupOrContext?.parser || parseDOM,
+    connection: markupOrContext?.connection
   })
+}
 
 /**
  * Join shears in series
