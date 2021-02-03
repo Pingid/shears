@@ -27,12 +27,13 @@ export const connect: {
  * @since 1.0.0
  * @param fetch Accepts a url and returns html/xml string.
  */
-export const goTo: <R, A>(url: string | Shear<R, string>, shear: Shear<Node | Node[], A>) => Shear<R, A> = (
-  url,
-  shear
-) => (r) =>
+export const goTo: <R, A, T>(
+  url: string | Shear<R, string>,
+  shear: Shear<Node | Node[], A>,
+  connection?: Connection<T>
+) => Shear<R, A> = (url, shear, connection) => (r) =>
   pipe(
-    r.connection,
+    r.connection || connection,
     (connecton) =>
       is<Connection<any>>((x) => x !== undefined)(connecton)
         ? TE.right<Error, Connection<unknown>>(connecton)
@@ -67,18 +68,19 @@ export const goTo: <R, A>(url: string | Shear<R, string>, shear: Shear<Node | No
  * @param limit number of times to attempt to paginate
  * @param follow selector executed on each iteration
  */
-export const paginate: <A>(
+export const paginate: <A, T>(
   url: string | Shear<Node | Node[], string>,
   limit: number,
   follow: Shear<Node | Node[], A>,
+  connection?: Connection<T>,
   results?: A[]
-) => Shear<Node | Node[], A[]> = (url, limit, follow, results = []) =>
+) => Shear<Node | Node[], A[]> = (url, limit, follow, connection, results = []) =>
   pipe(
     follow,
     RTE.chain((x) => {
       if (limit <= 0) return RTE.right([...results, x])
       return pipe(
-        goTo(url, paginate(url, limit - 1, follow, [...results, x])),
+        goTo(url, paginate(url, limit - 1, follow, connection, [...results, x]), connection),
         RTE.alt(() => RTE.right([...results, x]))
       )
     })
