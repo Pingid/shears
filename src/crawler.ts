@@ -1,13 +1,19 @@
 import * as RTE from 'fp-ts/ReaderTaskEither'
 import { pipe } from 'fp-ts/lib/function'
 import * as TE from 'fp-ts/TaskEither'
+import * as T from 'fp-ts/Task'
 import { Node } from 'domhandler'
 
 import { Shear } from './shear'
 import { is } from './utility'
 
 export interface Connection<T> {
-  readonly fetch: (url: string, ctx: T) => Promise<Node | Node[] | string | { markup: string; ctx: T }>
+  readonly fetch: (
+    url: string,
+    ctx: T
+  ) =>
+    | Promise<Node | Node[] | string | { content: string; ctx: T }>
+    | TE.TaskEither<Error, Node | Node[] | string | { content: string; ctx: T }>
   readonly ctx: T
 }
 
@@ -43,14 +49,18 @@ export const goTo: <R, A, T>(
         is.function(url) && r ? url(r) : TE.of(url as string),
         TE.chain((y) =>
           pipe(
-            TE.tryCatch(
-              () => fetch(y, r.connection?.ctx),
-              (err) => new Error(`${err}`)
-            ),
+            fetch(y, r.connection?.ctx),
+            (y) =>
+              is<Promise<any>>(is.object)(y)
+                ? TE.tryCatch(
+                    () => y,
+                    (err) => new Error(`${err}`)
+                  )
+                : y,
             TE.map((x) => {
               if (is.string(x)) return { ...r, data: r.parser(x) }
               if (is<Node>((y) => y instanceof Node)(x) || is.array(x)) return { ...r, data: x }
-              return { ...r, ctx: x.ctx, data: r.parser(x.markup) }
+              return { ...r, ctx: x.ctx, data: r.parser(x.content) }
             }),
             TE.chain(shear)
           )
