@@ -146,7 +146,7 @@ export const text: {
 export const html: (options?: DomSerializerOptions) => Shear<Node[] | Node, string> = (options) =>
   pipe(
     RTE.ask<Context<Node | Node[]>>(),
-    RTE.map((r) => serialize(r.data, options))
+    RTE.map((r) => serialize(r.data as any, options))
   )
 
 /**
