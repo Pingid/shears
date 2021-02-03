@@ -1,7 +1,6 @@
 import * as RTE from 'fp-ts/ReaderTaskEither'
 import { pipe } from 'fp-ts/lib/function'
 import * as TE from 'fp-ts/TaskEither'
-import * as T from 'fp-ts/Task'
 import { Node } from 'domhandler'
 
 import { Shear } from './shear'
@@ -39,7 +38,7 @@ export const goTo: <R, A, T>(
   connection?: Connection<T>
 ) => Shear<R, A> = (url, shear, connection) => (r) =>
   pipe(
-    r.connection || connection,
+    connection || r.connection,
     (connecton) =>
       is<Connection<any>>((x) => x !== undefined)(connecton)
         ? TE.right<Error, Connection<unknown>>(connecton)
