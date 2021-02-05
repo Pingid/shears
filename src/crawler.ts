@@ -1,9 +1,8 @@
 import * as RTE from 'fp-ts/ReaderTaskEither'
 import { pipe } from 'fp-ts/lib/function'
 import * as TE from 'fp-ts/TaskEither'
-import { Node } from 'domhandler'
 
-import { Shear } from './shear'
+import { Shear, Node } from './shear'
 import { is } from './utility'
 
 export interface Connection<T> {
@@ -58,8 +57,9 @@ export const goTo: <R, A, T>(
                 : y,
             TE.map((x) => {
               if (is.string(x)) return { ...r, data: r.parser(x) }
-              if (is<Node>((y) => y instanceof Node)(x) || is.array(x)) return { ...r, data: x }
-              return { ...r, ctx: x.ctx, data: r.parser(x.content) }
+              if (is<{ content: string; ctx: unknown }>((y) => y && (y as any).content)(x))
+                return { ...r, ctx: x.ctx, data: r.parser(x.content) }
+              return { ...r, data: x }
             }),
             TE.chain(shear)
           )

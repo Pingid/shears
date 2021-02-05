@@ -1,5 +1,5 @@
 import { parseDOM } from 'htmlparser2'
-import { Node } from 'domhandler'
+import * as DH from 'domhandler'
 
 import { sequenceS, sequenceT } from 'fp-ts/lib/Apply'
 import * as RTE from 'fp-ts/ReaderTaskEither'
@@ -10,6 +10,7 @@ import * as A from 'fp-ts/Array'
 import { Connection } from './crawler'
 import { is } from './utility'
 
+export type Node = DH.Node
 export type Context<R, A = unknown> = {
   readonly data: R
   readonly parser: typeof parseDOM

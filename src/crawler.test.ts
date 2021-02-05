@@ -11,7 +11,7 @@ test('Example', async () => {
   const connection = connect(
     (url, _ctx) =>
       Promise.resolve({
-        markup: page(url as '/' | '/one'),
+        content: page(url as '/' | '/one'),
         ctx: { hostname: url }
       }),
     { hostname: '/' }
@@ -42,7 +42,6 @@ test('Example', async () => {
         )
       })
     ),
-    undefined,
     { connection }
   )()
 
@@ -55,13 +54,12 @@ it('Should return DOM AST', async () => {
   const connection = connect(
     (url, ctx) => {
       if (fn) fn(url, ctx)
-      return Promise.resolve({ markup: `<h1>hello</h1>`, ctx })
+      return Promise.resolve({ content: `<h1>hello</h1>`, ctx })
     },
     { hostname: 'http://helloworld.com' }
   )
   const result = await run(
     goTo('/', (r) => TE.of(r)),
-    undefined,
     { connection }
   )()
   if (isLeft(result)) throw result.left
