@@ -1,5 +1,5 @@
 {
-  "exclude": ["node_modules", "lib", "src/*.test.ts"],
+  "exclude": ["node_modules", "lib", "src/*.test.ts", "es6"],
   "compilerOptions": {
     "outDir": "./lib",
     "rootDir": "./src",
@@ -22,9 +22,7 @@
     "allowSyntheticDefaultImports": true /* Allow default imports from modules with no default export. This does not affect code emit, just typechecking. */,
     "esModuleInterop": true /* Enables emit interoperability between CommonJS and ES Modules via creation of namespace objects for all imports. Implies 'allowSyntheticDefaultImports'. */,
 
-    "inlineSourceMap": true /* Emit a single file with source maps instead of having a separate file. */,
-    "inlineSources": true /* Emit the source alongside the sourcemaps within a single file; requires '--inlineSourceMap' or '--sourceMap' to be set. */,
-
+    "sourceMap": true,
     "skipLibCheck": true /* Skip type checking of declaration files. */,
     "forceConsistentCasingInFileNames": true /* Disallow inconsistently-cased references to the same file. */,
     "baseUrl": ".",

@@ -1,0 +1,37 @@
+name: Create release
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  create_release:
+    name: Create release
+    runs-on: ubuntu-20.04
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: setup node version
+        uses: actions/setup-node@v2
+        with:
+          cache: 'yarn'
+          node-version: '16'
+      - name: install dependencies
+        run: yarn install
+      - name: transpile typescript
+        run: yarn build
+      - name: run tests
+        run: yarn test
+      - name: Get latest release tag
+        id: latest_release_tag
+        uses: InsonusK/get-latest-release@v1.0.1
+        with:
+          myToken: ${{ github.token }}
+          view_top: 1
+      - name: Get current version
+        id: current_version
+        run: echo "::set-output name=version::$(node -e 'console.log(require(\"./package.json\").version)')"
+      - name: Create a new release
+        uses: softprops/action-gh-release@v1
+        if: ${{ steps.latest_release_tag.outputs.tag_name != steps.current_version.outputs.version }}

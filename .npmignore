@@ -1,5 +1,6 @@
 .github
-node_modules
-src
+.vscode
 tsconfig.tsbuildinfo
 tsconfig.json
+node_modules
+src

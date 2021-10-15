@@ -1,0 +1,25 @@
+name: Publish package
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: setup node version
+        uses: actions/setup-node@v2
+        with:
+          cache: 'yarn'
+          node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
+      - name: install dependencies
+        run: yarn install
+      - name: transpile typescript
+        run: yarn build
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

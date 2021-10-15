@@ -1,23 +1,153 @@
-import { parseDOM } from 'htmlparser2'
-import * as DH from 'domhandler'
+import ds, { DomSerializerOptions } from 'dom-serializer'
+import { parseDocument } from 'htmlparser2'
+import * as dh from 'domhandler'
+import * as cs from 'css-select'
+import * as du from 'domutils'
 
 import { sequenceS, sequenceT } from 'fp-ts/lib/Apply'
+import { flow, pipe } from 'fp-ts/lib/function'
+import { fromNullable } from 'fp-ts/lib/Either'
 import * as RTE from 'fp-ts/ReaderTaskEither'
-import { TaskEither } from 'fp-ts/TaskEither'
-import { pipe } from 'fp-ts/lib/pipeable'
-import * as A from 'fp-ts/Array'
+import * as TE from 'fp-ts/TaskEither'
 
-import { Connection } from './crawler'
-import { is } from './utility'
+import { is, CountArrayDepth, QueryError } from './utility'
 
-export type Node = DH.Node
-export type Context<R, A = unknown> = {
+// -------------------------------------------------------------------------------------
+// Types
+// -------------------------------------------------------------------------------------
+export interface Node extends dh.Node {}
+
+export interface Context<R> {
   readonly data: R
-  readonly parser: typeof parseDOM
-  readonly connection?: Connection<A>
+  readonly parser: typeof parseDocument
+  readonly parallel: boolean
 }
 
-export interface Shear<R, A> extends RTE.ReaderTaskEither<Context<R>, Error, A> {}
+export interface Shear<R, E, A> extends RTE.ReaderTaskEither<Context<R>, E, A> {}
+
+// -------------------------------------------------------------------------------------
+// Core Api
+// -------------------------------------------------------------------------------------
+interface Select {
+  /**
+   * Select takes arguments
+   *
+   * @category Selector
+   * @since 1.0.0
+   */
+  <E>(): Shear<Node[] | Node, E, Node[] | Node>
+
+  // Query single
+  (selector: string): Shear<Node[] | Node, Error, Node>
+  (...args: [string | Shear<Node | Node[], Error, Node>, ...(Shear<Node, Error, Node> | string)[]]): Shear<
+    Node[] | Node,
+    Error,
+    Node
+  >
+  <T>(
+    ...args: [
+      string | Shear<Node | Node[], Error, Node>,
+      ...(Shear<Node, Error, Node> | string)[],
+      Shear<Node, Error, T>
+    ]
+  ): Shear<Node[] | Node, Error, T>
+
+  // Query many
+  (selector: [string]): Shear<Node[] | Node, Error, Node[]>
+
+  /**
+   * Get the text content.
+   *
+   * @category Selector
+   * @since 1.0.0
+   */
+  <S extends (string | [string])[]>(...args: S): Shear<Node[] | Node, Error, CountArrayDepth<S, Node>>
+  <S extends (string | [string])[], T>(...args: [...S, Shear<Node, Error, T>]): Shear<
+    Node[] | Node,
+    Error,
+    CountArrayDepth<S, T>
+  >
+
+  // Query struct
+  <N extends Node[] | Node, T extends { [x: string | number]: Shear<N, Error, any> }>(struct: T): Shear<
+    N,
+    Error,
+    { [K in keyof T]: T[K] extends Shear<any, Error, infer R> ? R : never }
+  >
+  <T extends { [x: string | number]: Shear<Node[] | Node, Error, any> }>(
+    ...args: [string | Shear<Node[] | Node, Error, Node>, ...(string | Shear<Node, Error, Node>)[], T]
+  ): Shear<Node[] | Node, Error, { [K in keyof T]: T[K] extends Shear<any, Error, infer R> ? R : never }>
+
+  // Query tuple
+  <T extends ReadonlyArray<Shear<Node[] | Node, Error, any>>>(arr: T): Shear<
+    Node[] | Node,
+    Error,
+    { [K in keyof T]: [T[K]] extends [Shear<any, Error, infer R>] ? R : never }
+  >
+}
+const select: Select = (...args: unknown[]) => {
+  const failure = {
+    error: new QueryError(``, select),
+    stack: [] as string[]
+  }
+
+  const recursiveSelect =
+    (failure: { error: Error; stack: string[] }, ...args: unknown[]): Shear<Node[] | Node, Error, any> =>
+    (ctx) => {
+      if (args.length === 0) return TE.right(ctx.data)
+
+      const [head, ...tail] = args
+      if (is.string(head)) {
+        const fail = { ...failure, stack: [...failure.stack, head] }
+        failure.error.message = `Missing: ${[...failure.stack].join(' > ')} > ( ${head} )`
+        const selected = pipe(cs.selectOne(head, ctx.data), fromNullable(failure.error), TE.fromEither)
+        return pipe(
+          selected,
+          TE.chain((data) => recursiveSelect(fail, ...(tail as any))({ ...ctx, data }))
+        )
+      }
+
+      if (is.array(head)) {
+        if (is.string(head[0])) {
+          const selected = TE.right(cs.selectAll(head[0], ctx.data))
+          const fail = { ...failure, stack: [...failure.stack, `[${head}]`] }
+          return pipe(
+            selected,
+            TE.chain(flow(TE.traverseArray((data) => recursiveSelect(fail, ...(tail as any))({ ...ctx, data }))))
+          )
+        }
+        if (ctx.parallel) return sequenceT(RTE.ApplicativePar)(...(head as [Shear<any, any, any>]))(ctx)
+        return sequenceT(RTE.ApplicativeSeq)(...(head as [Shear<any, any, any>]))(ctx)
+      }
+
+      if (is<Shear<any, Error, any>>(is.function)(head)) {
+        const selected = pipe(
+          head(ctx),
+          TE.mapLeft((error) => {
+            error.message = `${failure.stack.join(' > ')} > ( ${error.message} )`
+            return error
+          })
+        )
+        const fail = { ...failure, stack: [...failure.stack, `shear(${head.name})`] }
+        return pipe(
+          selected,
+          TE.chain((data) => recursiveSelect(fail, ...(tail as any))({ ...ctx, data }))
+        )
+      }
+
+      if (is<{ [x: string]: Shear<any, Error, any> }>(is.shape)(head)) {
+        if (ctx.parallel) return sequenceS(RTE.ApplicativePar)(head)(ctx)
+        return sequenceS(RTE.ApplicativeSeq)(head)(ctx)
+      }
+
+      failure.error.message = `Incorrect argument type ${failure.stack.join(' > ')} ( <${typeof head}>:${head} )`
+      throw failure.error
+    }
+
+  return recursiveSelect(failure, ...args)
+}
+
+export default select
 
 /**
  * Run a shear
@@ -25,109 +155,118 @@ export interface Shear<R, A> extends RTE.ReaderTaskEither<Context<R>, Error, A> 
  * @since 1.0.0
  * @param shear selector.
  */
-export const run: <T>(
-  shear: Shear<Node | Node[], T>,
+export const run: <S extends Shear<Node | Node[], any, any>>(
+  shear: S,
   markupOrContext?: string | Partial<Context<Node | Node[], any>>
-) => TaskEither<Error, T> = (shear, markupOrContext) => {
-  if (is.string(markupOrContext)) return shear({ data: parseDOM(markupOrContext), parser: parseDOM })
+) => TE.TaskEither<Error, S extends Shear<any, any, infer D> ? D : never> = (shear, markupOrContext) => {
+  if (is.string(markupOrContext)) {
+    return shear({ data: parseDocument(markupOrContext).children, parser: parseDocument, parallel: false })
+  }
   return shear({
+    ...markupOrContext,
     data: markupOrContext?.data || [],
-    parser: markupOrContext?.parser || parseDOM,
-    connection: markupOrContext?.connection
+    parser: markupOrContext?.parser || parseDocument,
+    parallel: !!markupOrContext?.parallel
   })
 }
 
 /**
- * Join shears in series
+ * If a shear fails return null
  *
- * @example
- *
- * const innerText = join($('h1'), text);
- *
- * @since 1.0.0
- * @params Shear[]
- */
-export const join: Join = (...[head, ...tail]: any[]) =>
-  !head
-    ? RTE.readerTaskEither.map(RTE.ask<Context<any>>(), (x) => x.data)
-    : RTE.readerTaskEither.chain(head, (x) => (y: any) => join(...(tail as [Shear<any, any>]))({ ...y, data: x }))
-
-type Join = {
-  (): Shear<any, any>
-  <R, A>(a: Shear<R, A>): Shear<R, A>
-  <R, A, B>(a: Shear<R, A>, b: Shear<A, B>): Shear<R, B>
-  <R, A, B, C>(a: Shear<R, A>, b: Shear<A, B>, c: Shear<B, C>): Shear<R, C>
-  <R, A, B, C, D>(a: Shear<R, A>, b: Shear<A, B>, c: Shear<B, C>, d: Shear<C, D>): Shear<R, D>
-  <R, A, B, C, D, E>(a: Shear<R, A>, b: Shear<A, B>, c: Shear<B, C>, d: Shear<C, D>, e: Shear<D, E>): Shear<E, R>
-  <R, A, B, C, D, E, F>(
-    a: Shear<R, A>,
-    b: Shear<A, B>,
-    c: Shear<B, C>,
-    d: Shear<C, D>,
-    e: Shear<D, E>,
-    f: Shear<E, F>
-  ): Shear<R, F>
-  <R, A, B, C, D, E, F, G>(
-    a: Shear<R, A>,
-    b: Shear<A, B>,
-    c: Shear<B, C>,
-    d: Shear<C, D>,
-    e: Shear<D, E>,
-    f: Shear<E, F>,
-    g: Shear<F, G>
-  ): Shear<R, G>
-}
-
-/**
- * Resolves a structured shear.
- *
- * @example
- *
- * const contents = fork({ title: query('h1') })
- *
- * @category Selector
+ * @category Utility
  * @since 1.0.0
  */
-export const fork: <T extends Forked>(fork: T) => Shear<Node[] | Node, ForkResult<T>> = (_fork) => {
-  if (is<Shear<any, any>>(is.function)(_fork)) return _fork
-  if (is<Shear<any, any>[]>(is.array)(_fork)) return sequenceT(RTE.readerTaskEither)(...(_fork as any)) as any
-  if (is<{ [x: string]: Forked<any> }>(is.shape)(_fork)) return sequenceS(RTE.readerTaskEither)(_fork as any) as any
-}
-
-type Forked<T = any, R = any> = Shear<T, R> | ReadonlyArray<Shear<T, R>> | { [x: string]: Shear<T, R> }
-type ForkResult<T extends Forked> = T extends Shear<any, infer D>
-  ? D
-  : T extends ReadonlyArray<Shear<any, any>>
-  ? { [K in keyof T]: [T[K]] extends [Forked<any, infer A>] ? A : never }
-  : T extends { [x: string]: Shear<any, any> }
-  ? { [K in keyof T]: [T[K]] extends [Forked<any, infer A>] ? A : never }
-  : never
-
-/**
- * Run the same selector on an array of Nodes
- *
- * @category Selector
- * @since 1.0.0
- * @param a shear.
- * @param b fallback shear or value
- */
-export const each: <R, A>(shear: Shear<R, A>) => Shear<R[], A[]> = (_shear) =>
-  pipe(
-    RTE.ask<Context<any[]>>(),
-    RTE.chain((x) => A.array.traverse(RTE.readerTaskEither)(x.data, (y) => (z) => _shear({ ...z, data: y })))
-  )
-
-/**
- * Paginate the same selector
- *
- * @category Selector
- * @since 1.0.0
- * @param a shear.
- * @param b fallback shear or value
- */
-export const getOrElse: <A, B, C>(a: Shear<A, B>, b: C | Shear<A, C>) => Shear<A, B | C> = (a, b) =>
-  RTE.readerTaskEither.alt(a, () => (is<Shear<any, any>>(is.function)(b) ? b : RTE.of(b)))
-
 export const nullable: {
-  <A, B>(a: Shear<A, B>): Shear<A, B | null>
-} = (a) => RTE.readerTaskEither.alt(a, () => RTE.right(null))
+  <A, B>(a: Shear<A, Error, B>): Shear<A, Error, B | null>
+} = flow(RTE.altW(() => RTE.right(null)))
+select.nullable = nullable
+interface Select {
+  nullable: typeof nullable
+}
+// -------------------------------------------------------------------------------------
+// Node Selectors
+// -------------------------------------------------------------------------------------
+
+/**
+ * Get the text content.
+ *
+ * @category Selector
+ * @since 1.0.0
+ */
+export const text: Shear<Node[] | Node, never, string> = (r) => TE.right(du.textContent(r.data))
+select.text = text
+interface Select {
+  text: typeof text
+}
+/**
+ * Get the serialised html.
+ *
+ * @category Selector
+ * @since 1.0.0
+ */
+export const serialize: (options?: DomSerializerOptions) => Shear<Node[] | Node, Error, string> = (o) => (r) =>
+  TE.right(ds(r.data as any, o))
+select.serialize = serialize
+interface Select {
+  serialize: typeof serialize
+}
+/**
+ * Get the serialised html.
+ *
+ * @category Selector
+ * @since 1.0.0
+ */
+export const html = serialize()
+select.html = html
+interface Select {
+  html: typeof html
+}
+/**
+ * Select all the attributes on an element
+ *
+ * @category Selector
+ * @since 1.0.0
+ */
+export const attributes: Shear<Node, Error, { [x: string]: string }> = (r: Context<Node>) => {
+  const error = new QueryError(`Node is not an element type`, attributes)
+  return r.data instanceof dh.Element ? TE.right(r.data.attribs) : TE.left<QueryError, never>(error)
+}
+select.attributes = attributes
+interface Select {
+  attributes: typeof attributes
+}
+/**
+ * Select a particular attribute from a Node.
+ *
+ * @category Selector
+ * @since 1.0.0
+ */
+export const atr: (prop: string) => Shear<Node, Error, string> = (prop) => {
+  const error = new QueryError(`Node doesn't have attribute (${prop})`, atr)
+  return pipe(
+    attributes,
+    RTE.chain((y) => (is.undefined(y[prop]) ? RTE.left(error) : RTE.right(y[prop])))
+  )
+}
+select.atr = atr
+interface Select {
+  atr: typeof atr
+}
+// -------------------------------------------------------------------------------------
+// Traversal
+// -------------------------------------------------------------------------------------
+
+/**
+ * Get node parent.
+ *
+ * @category Selector
+ * @since 1.0.0
+ */
+export const parent: (nth?: number) => Shear<Node, Error, Node> = (nth = 1) => {
+  const error = new QueryError(`Node has no ${nth > 1 ? `${nth} ` : ''}parent`, parent)
+  return (r) => pipe(du.getParent(r.data), fromNullable(error), TE.fromEither)
+}
+select.parent = parent
+interface Select {
+  parent: typeof parent
+}
