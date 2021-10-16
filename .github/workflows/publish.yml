@@ -1,0 +1,32 @@
+name: Publish package
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: setup node version
+        uses: actions/setup-node@v2
+        with:
+          cache: 'yarn'
+          node-version: '16.x'
+          registry-url: 'https://registry.npmjs.org'
+      - name: install dependencies
+        run: yarn install
+      - name: transpile typescript
+        run: yarn build
+      - name: Get current version
+        id: current_version
+        run: echo "::set-output name=version::$(node -e 'console.log(require(`./package.json`).version)')"
+      - name: Get latest version
+        id: latest_version
+        run: echo "::set-output name=version::$(npm dist-tag ls | cut -d ' ' -f 2 | xargs echo)"
+      - run: npm publish
+        if: ${{ steps.current_version.outputs.version != steps.latest_version.outputs.version }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
