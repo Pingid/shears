@@ -4,7 +4,7 @@ import * as RTE from 'fp-ts/ReaderTaskEither'
 import { pipe } from 'fp-ts/lib/function'
 import * as TE from 'fp-ts/TaskEither'
 
-import { is, QueryError } from './utility'
+import { is, ShearError } from './utility'
 import { Shear } from './shear'
 
 declare module './shear' {
@@ -31,7 +31,7 @@ export interface Connection<T> {
 /**
  * Create network driver
  *
- * @since 1.0.0
+ * @since 0.0.1
  * @category Crawling
  */
 export const connect: {
@@ -42,7 +42,7 @@ export const connect: {
 /**
  * Go to a URL and return HTML AST.
  *
- * @since 1.0.0
+ * @since 0.0.1
  * @category Crawling
  * @param fetch Accepts a url and returns html/xml string.
  */
@@ -51,7 +51,7 @@ export const goTo: <R, A, T>(
   shear: Shear<Node | Node[], Error, A>,
   connection?: Connection<T>
 ) => Shear<R, Error, A> = (url, shear, connection) => {
-  const error = new QueryError(
+  const error = new ShearError(
     `No connection found in the parent context\nYou can provide it in your run functon or provide it as the third argument of goto\n\ngoTo('/foo', select('title'), select.connect({ your fetch implementation })`,
     goTo
   )
@@ -92,7 +92,7 @@ export const goTo: <R, A, T>(
  * Paginate on a url selector stop when it fails or reaches the iteration limit
  *
  * @category Selector
- * @since 1.0.0
+ * @since 0.0.1
  * @param url string or Selector passed to the @ref goTo function
  * @param limit number of times to attempt to paginate
  * @param follow selector executed on each iteration

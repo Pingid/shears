@@ -8,9 +8,9 @@ is.string = is<string>((x) => typeof x === 'string')
 is.array = is<any[]>((x) => Array.isArray(x))
 is.shape = is<Record<any, any>>((x) => is.object(x) && !is.function(x) && !is.array(x) && !is.null(x))
 is.null = is<null>((x) => x === null)
-is.falsy = is<null | undefined>((x) => x === null || x === undefined)
 is.undefined = is<undefined>((x) => typeof x === 'undefined')
 
+export type Last<T extends any[]> = T extends [...any[], infer D] ? D : never
 export type CountArrayDepth<A, B> = A extends []
   ? B
   : A extends [infer H, ...infer R]
@@ -19,7 +19,7 @@ export type CountArrayDepth<A, B> = A extends []
     : CountArrayDepth<R, B>
   : never
 
-export class QueryError extends Error {
+export class ShearError extends Error {
   constructor(m?: string, fn?: Function) {
     super(m)
     Error.captureStackTrace(this, fn)

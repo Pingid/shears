@@ -1,14 +1,12 @@
-import { parseDocument } from 'htmlparser2'
 import * as du from 'domutils'
 
 import { isLeft, isRight } from 'fp-ts/lib/Either'
 import { map } from 'fp-ts/ReaderTaskEither'
+import { pipe } from 'fp-ts/lib/function'
 import * as TE from 'fp-ts/TaskEither'
 
-import sh, { run } from './index'
 import { connect, goTo } from './connect'
-import { pipe } from 'fp-ts/lib/function'
-import { string } from 'fp-ts'
+import sh, { run } from './index'
 
 describe('select', () => {
   it('should handle single string css selecter', async () => {
@@ -76,7 +74,7 @@ describe('select', () => {
 
 describe('selecters', () => {
   it('should return sibling nodes', async () => {
-    const result = await run(sh('h1', sh.parent()), `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`)()
+    const result = await run(sh('h1', sh.parent), `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`)()
     if (isLeft(result)) throw result.left
     expect(du.isTag(result.right) && result.right.tagName).toBe('div')
   })
@@ -134,7 +132,7 @@ describe('Crawling', () => {
           posts: sh(
             ['li'],
             sh({
-              title: sh('h4', sh.parent(), 'h4', trimText),
+              title: sh('h4', sh.parent, 'h4', trimText),
               body: sh('p', sh.text),
               bod_html: sh('p', sh.html),
               image: goTo(

@@ -17,7 +17,7 @@ await resolveP(article_list, '<html><...')
 // [{ title: '...' content: '...' },{...]
 ```
 
-The library works best when used in combination with fp-ts however the resolveP returns a `Promise` instead of `TaskEither` returned by the `run` function, this allows for standalone use but still requires fp-ts as a peer dependency.
+The library works best when used in combination with [fp-ts](https://github.com/gcanti/fp-ts) however the resolveP returns a `Promise` instead of `TaskEither` returned by the `run` function, this allows for standalone use but still requires fp-ts as a peer dependency.
 
 ## Usage
 
@@ -42,7 +42,7 @@ Each query in the list of arguments operates on the part of the DOM returned by 
 
 ### customizing Shears
 
-A "Shear" extends the `ReaderTaskEither` type class so you can easily build your selectors.
+A "Shear" extends the [ReaderTaskEither](https://gcanti.github.io/fp-ts/modules/ReaderTaskEither.ts.html) type class so you can easily build your selectors.
 
 ```typescript
 import { map } from 'fp-ts/ReaderTaskEither'
@@ -87,7 +87,7 @@ run(
 )
 ```
 
-Often it is the case you want to follow relative links on a website where our connection would need to know the current hostname. "Shears" provide a mechanism for passing context we just need to change our connection implementation.
+Often it is the case you want to follow relative links on a website where our connection would need to know the current hostname. The "Shear" provides a mechanism for passing context we just need to change the connection implementation.
 
 ```typescript
 const connection = connect(
