@@ -23,7 +23,7 @@ The library works best when used in combination with [fp-ts](https://github.com/
 
 ### Selectors
 
-The `select` function is the main building block and accepts any number of arguments of type `string`, `[string]`, `Shear<Node, Node>` where the final argument can be of type `Shear<Node, T>`.
+The `select` function is the main building block and can be used for chaining selectors of type `string`, `[string]`, `Shear<Node, Node>` where the final argument can be of type `Shear<Node, T>`.
 
 ```typescript
 sh.select('body > h1') // Shear<Node | Node[], Node<h1>>
@@ -39,6 +39,13 @@ sh.select([sh.text, sh.text]) // Shear<Node | Node[], [string, string]>
 - `[string]`: Accepts a css query and returns all matching DOM nodes like `document.querySelectorAll`.
 
 Each query in the list of arguments operates on the part of the DOM returned by the previous query where parameters after `[string]` queries operate on each item in the return list.
+
+`select` can also be used for creating structured queries where it takes a single argument of type `{ [x: string]: Shear<Node, T> }` or `Shear<Node, Node>[]`.
+
+```typescript
+sh.select({ title: sh.select('title') }) // Shear<Node | Node[], { title: Node<title> }>
+sh.select([sh.select('title'), sh.select('h1')] as const) // Shear<Node | Node[], [Node<title>, Node<title>]>
+```
 
 ### customizing Shears
 
