@@ -1,6 +1,6 @@
 {
   "name": "shears",
-  "version": "0.0.0-alpha.81",
+  "version": "0.0.0-alpha.82",
   "main": "lib/index.js",
   "module": "es6/index.js",
   "typings": "lib/index.d.ts",

@@ -38,7 +38,7 @@ interface Select {
    *
    * sh('body > #content > ul', ['li'], sh({ title: sh('h1', sh.text) })) // [{ title: string },{...]
    *
-   * @category Selector
+   * @category selector
    * @since 0.0.1
    */
   <E>(): Shear<Node[] | Node, E, Node[] | Node>
@@ -147,13 +147,15 @@ export default select
  *
  * sh.run(sh('title', sh.text), <html ...) // TaskEither<Error, string>
  *
- * @since 0.0.1
  * @param shear selector.
+ *
+ * @category utility
+ * @since 0.0.1
  */
 export const run: <S extends Shear<Node | Node[], any, any>>(
   shear: S,
   markupOrContext?: string | Partial<Context<Node | Node[], any>>
-) => TE.TaskEither<Error, S extends Shear<any, any, infer D> ? D : never> = (shear, markupOrContext) => {
+) => TE.TaskEither<Error, TypeOfShearReturn<S>> = (shear, markupOrContext) => {
   if (is.string(markupOrContext)) {
     return shear({ data: parseDocument(markupOrContext).children, parser: parseDocument, parallel: false })
   }
@@ -166,6 +168,29 @@ export const run: <S extends Shear<Node | Node[], any, any>>(
 }
 
 /**
+ * Resolve a shear to a Promise
+ *
+ * @example
+ * import * as sh from 'shears'
+ *
+ * sh.runP(sh('title', sh.text), <html ...) // Promise<string>
+ *
+ * @param shear selector.
+ * @param markupOrContext html string or Shear context object.
+ *
+ * @category utility
+ * @since 0.0.1
+ */
+export const runP: <S extends Shear<Node | Node[], any, any>>(
+  shear: S,
+  markupOrContext?: string | Partial<Context<Node | Node[], any>>
+) => Promise<TypeOfShearReturn<S>> = (shear, markupOrContext) =>
+  pipe(
+    run(shear, markupOrContext),
+    TE.getOrElse((error) => () => Promise.reject(error))
+  )()
+
+/**
  * Create a shear that returns null instead of failing
  *
  * @example
@@ -173,7 +198,7 @@ export const run: <S extends Shear<Node | Node[], any, any>>(
  *
  * sh({ title: sh.nullable(sh('title', sh.text)) }) // { title: string | null }
  *
- * @category Utility
+ * @category utility
  * @since 0.0.1
  */
 export const nullable: {
@@ -190,7 +215,7 @@ interface Select {
 /**
  * Get the inner text content.
  *
- * @category Selector
+ * @category selector
  * @since 0.0.1
  */
 export const text: Shear<Node[] | Node, never, string> = (r) => TE.right(du.textContent(r.data))
@@ -204,7 +229,7 @@ interface Select {
  *
  * @param {DomSerializerOptions}
  *
- * @category Selector
+ * @category selector
  * @since 0.0.1
  */
 export const serialize: (options?: DomSerializerOptions) => Shear<Node[] | Node, Error, string> = (o) => (r) =>
@@ -216,7 +241,7 @@ interface Select {
 /**
  * See {@link serialize} with default serializer options.
  *
- * @category Selector
+ * @category selector
  * @since 0.0.1
  */
 export const html = serialize()
@@ -227,7 +252,7 @@ interface Select {
 /**
  * Get all the attributes on an element
  *
- * @category Selector
+ * @category selector
  * @since 0.0.1
  */
 export const attributes: Shear<Node, Error, { [x: string]: string }> = (r: Context<Node>) => {
@@ -241,7 +266,7 @@ interface Select {
 /**
  * Select a particular attribute from an Element
  *
- * @category Selector
+ * @category selector
  * @since 0.0.1
  */
 export const atr: (prop: string) => Shear<Node, Error, string> = (prop) => {

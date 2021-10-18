@@ -29,10 +29,10 @@ export interface Connection<T> {
 }
 
 /**
- * Create network driver
+ * Create a connection handler to be passed in goTo, run or resolveP functions
  *
  * @since 0.0.1
- * @category Crawling
+ * @category crawler
  */
 export const connect: {
   (fetch: Connection<undefined>['fetch']): Connection<undefined>
@@ -42,9 +42,12 @@ export const connect: {
 /**
  * Go to a URL and return HTML AST.
  *
+ * @param {string | Shear<Node | Node, string>} url link address passed to the connection handler.
+ * @param {Shear<Node | Node, T>} shear Shear to run on returned DOM
+ * @param {Connection<any>} connection connection handler
+ *
  * @since 0.0.1
- * @category Crawling
- * @param fetch Accepts a url and returns html/xml string.
+ * @category crawler
  */
 export const goTo: <R, A, T>(
   url: string | Shear<R, Error, string>,
@@ -91,16 +94,17 @@ export const goTo: <R, A, T>(
 /**
  * Paginate on a url selector stop when it fails or reaches the iteration limit
  *
- * @category Selector
- * @since 0.0.1
  * @param url string or Selector passed to the @ref goTo function
  * @param limit number of times to attempt to paginate
- * @param follow selector executed on each iteration
+ * @param shear selector executed on each iteration
+ *
+ * @category crawler
+ * @since 0.0.1
  */
 export const paginate: <A, T>(
   url: string | Shear<Node | Node[], Error, string>,
   limit: number,
-  follow: Shear<Node | Node[], Error, A>,
+  shear: Shear<Node | Node[], Error, A>,
   connection?: Connection<T>,
   results?: A[]
 ) => Shear<Node | Node[], Error, A[]> = (url, limit, follow, connection, results = []) =>
