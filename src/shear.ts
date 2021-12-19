@@ -75,7 +75,7 @@ interface Select {
     { [K in keyof T]: [T[K]] extends [Shear<any, Error, infer R>] ? R : never }
   >
 }
-const select: Select = (...args: unknown[]) => {
+export const select: Select = (...args: unknown[]) => {
   const failure = {
     error: new ShearError(``, select),
     stack: [] as string[]
@@ -136,8 +136,6 @@ const select: Select = (...args: unknown[]) => {
 
   return recursiveSelect(failure, ...args) as any
 }
-
-export default select
 
 /**
  * Resolve a shear to a TaskEither
@@ -204,10 +202,7 @@ export const runP: <S extends Shear<Node | Node[], any, any>>(
 export const nullable: {
   <A, B>(a: Shear<A, Error, B>): Shear<A, Error, B | null>
 } = flow(RTE.altW(() => RTE.right(null)))
-select.nullable = nullable
-interface Select {
-  nullable: typeof nullable
-}
+
 // -------------------------------------------------------------------------------------
 // Node Selectors
 // -------------------------------------------------------------------------------------
@@ -219,10 +214,6 @@ interface Select {
  * @since 0.0.1
  */
 export const text: Shear<Node[] | Node, never, string> = (r) => TE.right(du.textContent(r.data))
-select.text = text
-interface Select {
-  text: typeof text
-}
 
 /**
  * Get the serialised html.
@@ -234,10 +225,7 @@ interface Select {
  */
 export const serialize: (options?: DomSerializerOptions) => Shear<Node[] | Node, Error, string> = (o) => (r) =>
   TE.right(ds(r.data as any, o))
-select.serialize = serialize
-interface Select {
-  serialize: typeof serialize
-}
+
 /**
  * See {@link serialize} with default serializer options.
  *
@@ -245,10 +233,7 @@ interface Select {
  * @since 0.0.1
  */
 export const html = serialize()
-select.html = html
-interface Select {
-  html: typeof html
-}
+
 /**
  * Get all the attributes on an element
  *
@@ -259,10 +244,7 @@ export const attributes: Shear<Node, Error, { [x: string]: string }> = (r: Conte
   const error = new ShearError(`Node is not an element type`, attributes)
   return r.data instanceof dh.Element ? TE.right(r.data.attribs) : TE.left<ShearError, never>(error)
 }
-select.attributes = attributes
-interface Select {
-  attributes: typeof attributes
-}
+
 /**
  * Select a particular attribute from an Element
  *
@@ -275,10 +257,6 @@ export const atr: (prop: string) => Shear<Node, Error, string> = (prop) => {
     attributes,
     RTE.chain((y) => (is.undefined(y[prop]) ? RTE.left(error) : RTE.right(y[prop])))
   )
-}
-select.atr = atr
-interface Select {
-  atr: typeof atr
 }
 
 // -------------------------------------------------------------------------------------
@@ -295,8 +273,3 @@ interface Select {
  */
 export const parent: Shear<Node, Error, Node> = (r) =>
   pipe(du.getParent(r.data), fromNullable(new ShearError(`Node has no parent`, parent)), TE.fromEither)
-
-select.parent = parent
-interface Select {
-  parent: typeof parent
-}
