@@ -251,8 +251,8 @@ export const attributes: Shear<Node, Error, { [x: string]: string }> = (r: Conte
  * @category selector
  * @since 0.0.1
  */
-export const atr: (prop: string) => Shear<Node, Error, string> = (prop) => {
-  const error = new ShearError(`Node doesn't have attribute (${prop})`, atr)
+export const attr: (prop: string) => Shear<Node, Error, string> = (prop) => {
+  const error = new ShearError(`Node doesn't have attribute (${prop})`, attr)
   return pipe(
     attributes,
     RTE.chain((y) => (is.undefined(y[prop]) ? RTE.left(error) : RTE.right(y[prop])))

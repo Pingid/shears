@@ -108,7 +108,7 @@ describe('selecters', () => {
 
   it('should return style attribute', async () => {
     const result = await sh.run(
-      sh.select('div', sh.atr('style')),
+      sh.select('div', sh.attr('style')),
       `<div style="background:blue" role="button">click me</div>`
     )()
     if (isLeft(result)) throw result.left
@@ -151,9 +151,9 @@ describe('Crawling', () => {
               body: sh.select('p', sh.text),
               bod_html: sh.select('p', sh.html),
               image: goTo(
-                sh.select('a', sh.atr('href')),
+                sh.select('a', sh.attr('href')),
                 sh.select({
-                  src: sh.select('img', sh.atr('src'))
+                  src: sh.select('img', sh.attr('src'))
                 })
               )
             })
