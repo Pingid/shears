@@ -11,6 +11,7 @@ declare module './shear' {
   interface Context<R, A = unknown> {
     readonly connection?: Connection<A>
   }
+  interface Shear<R, E, A, C = unknown> extends RTE.ReaderTaskEither<Context<R, C>, E, A> {}
 }
 
 // -------------------------------------------------------------------------------------
