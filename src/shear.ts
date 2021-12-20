@@ -203,6 +203,28 @@ export const nullable: {
   <A, B>(a: Shear<A, Error, B>): Shear<A, Error, B | null>
 } = flow(RTE.altW(() => RTE.right(null)))
 
+/**
+ * Convert a shear to accept the output of one shear
+ *
+ * @example
+ * import { chain } from 'fp-ts/ReaderTaskEither'
+ * import { pipe } from 'fp-ts/function'
+ * import * as sh from 'shears'
+ *
+ * pipe(sh.parent, chain(chainable(sh.text)))
+ * sh({ title: sh.nullable(sh('title', sh.text)) }) // { title: string | null }
+ *
+ * @category utility
+ * @since 0.0.1
+ */
+export const chain: {
+  <A, B, C>(a: Shear<B, Error, C>): (b: Shear<A, Error, B>) => Shear<A, Error, C>
+} = (a) => (b) =>
+  pipe(
+    b,
+    RTE.chain((x) => (c) => a({ ...c, data: x }))
+  )
+
 // -------------------------------------------------------------------------------------
 // Node Selectors
 // -------------------------------------------------------------------------------------

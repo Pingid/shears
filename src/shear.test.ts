@@ -24,7 +24,7 @@ describe('select', () => {
     expect(du.textContent(result.right)).toBe('four')
   })
 
-  it('should handle quering multiple elements', async () => {
+  it('should handle querying multiple elements', async () => {
     const result = await sh.run(
       sh.select(['li']),
       '<ul><li>one<h1>two</h1>three</li><li>three<h1>four</h1>five</li></ul>'
@@ -62,6 +62,15 @@ describe('select', () => {
     if (isLeft(result)) throw result.left
     expect(du.textContent(result.right.one)).toEqual('1')
     expect(du.textContent(result.right.two)).toEqual('2')
+  })
+
+  it('should handle chaining queries', async () => {
+    const result = await sh.run(
+      pipe(sh.select('h1'), sh.chain(sh.parent), sh.chain(sh.text)),
+      '<div>one<h1>two</h1>three</div>'
+    )()
+    if (isLeft(result)) throw result.left
+    expect(result.right).toEqual('onetwothree')
   })
 
   describe('Errors', () => {
