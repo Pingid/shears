@@ -50,6 +50,7 @@ interface Select {
   >(
     ...args: S
   ): Shear<Node[] | Node, Error, CountArrayDepth<S, Node>>
+
   <
     S extends [
       string | [string] | Shear<Node | Node[], Error, Node>,
@@ -60,11 +61,19 @@ interface Select {
     ...args: S
   ): Shear<Node[] | Node, Error, CountArrayDepth<S, TypeOfShearReturn<Last<S>>>>
 
+  // Struct Query
+
   <N extends Node[] | Node, T extends { [x: string | number]: Shear<N, Error, any> }>(struct: T): Shear<
     N,
     Error,
     { [K in keyof T]: T[K] extends Shear<any, Error, infer R> ? R : never }
   >
+  <N extends Node, T extends { [x: string | number]: Shear<N, Error, any> }>(struct: T): Shear<
+    N,
+    Error,
+    { [K in keyof T]: T[K] extends Shear<any, Error, infer R> ? R : never }
+  >
+
   <T extends { [x: string | number]: Shear<Node[] | Node, Error, any> }>(
     ...args: [string | Shear<Node[] | Node, Error, Node>, ...(string | Shear<Node, Error, Node>)[], T]
   ): Shear<Node[] | Node, Error, { [K in keyof T]: T[K] extends Shear<any, Error, infer R> ? R : never }>
