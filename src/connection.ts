@@ -1,10 +1,9 @@
 import https from 'https'
 
-import type { Connection } from './connect'
+import { connect } from './connect'
 
-export const defaultConnection: Connection<{ hostname?: string }> = {
-  ctx: {},
-  fetch: (url: string, ctx?: { hostname?: string }) =>
+export const defaultConnection = connect<{ hostname?: string }>(
+  (url, ctx) =>
     new Promise<[string, { hostname: string }]>((resolve, reject) => {
       const _url = ctx?.hostname && !/^http.*|^www\.*/.test(url) ? ctx.hostname + url : url
       const req = https
@@ -19,5 +18,6 @@ export const defaultConnection: Connection<{ hostname?: string }> = {
           })
         })
         .on('error', reject)
-    })
-}
+    }),
+  {}
+)

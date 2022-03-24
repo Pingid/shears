@@ -4,9 +4,8 @@ import * as RTE from 'fp-ts/ReaderTaskEither'
 import { pipe } from 'fp-ts/lib/function'
 import * as TE from 'fp-ts/TaskEither'
 
-import { defaultConnection } from './connection'
+import { is, ShearError } from './utility'
 import { Shear } from './shear'
-import { is } from './utility'
 
 declare module './shear' {
   interface Context<R, A = unknown> {
@@ -56,8 +55,13 @@ export const goTo: <R, A, T>(
   shear: Shear<Node | Node[], Error, A>,
   connection?: Connection<T>
 ) => Shear<R, Error, A> = (url, shear, connection) => {
+  const error = new ShearError(
+    `No connection found in the parent context\nYou can provide it in your run functon or provide it as the third argument of goto\n\ngoTo('/foo', select('title'), select.connect({ your fetch implementation })`,
+    goTo
+  )
   return (r) => {
-    const connect = connection || r.connection || defaultConnection
+    const connect = connection || r.connection
+    if (is.undefined(connect)) return TE.left(error)
     return pipe(
       is.string(url) ? TE.right(url) : url(r),
       TE.chain((y) =>
