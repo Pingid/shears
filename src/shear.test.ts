@@ -1,6 +1,6 @@
 import * as du from 'domutils'
 
-import { isLeft, isRight } from 'fp-ts/lib/Either'
+import * as E from 'fp-ts/lib/Either'
 import { map } from 'fp-ts/ReaderTaskEither'
 import { pipe } from 'fp-ts/lib/function'
 import * as TE from 'fp-ts/TaskEither'
@@ -8,11 +8,16 @@ import * as TE from 'fp-ts/TaskEither'
 import { connect, goTo } from './connect'
 import * as sh from './index'
 
+const html = String.raw
+const right = <E, A>(x: E.Either<E, A>): A => {
+  if (E.isLeft(x)) throw x.left
+  return x.right
+}
+
 describe('select', () => {
   it('should handle single string css selecter', async () => {
     const result = await sh.run(sh.select('h1'), '<div>one<h1>two</h1>three</div>')()
-    if (isLeft(result)) throw result.left
-    expect(du.textContent(result.right)).toBe('two')
+    expect(du.textContent(right(result))).toBe('two')
   })
 
   it('should handle chaining string selectors', async () => {
@@ -20,8 +25,7 @@ describe('select', () => {
       sh.select('ul', sh.select('li:nth-child(2)'), sh.select('h1')),
       '<ul><li>one<h1>two</h1>three</li><li>three<h1>four</h1>five</li></ul>'
     )()
-    if (isLeft(result)) throw result.left
-    expect(du.textContent(result.right)).toBe('four')
+    expect(du.textContent(right(result))).toBe('four')
   })
 
   it('should handle querying multiple elements', async () => {
@@ -29,8 +33,7 @@ describe('select', () => {
       sh.select(['li']),
       '<ul><li>one<h1>two</h1>three</li><li>three<h1>four</h1>five</li></ul>'
     )()
-    if (isLeft(result)) throw result.left
-    expect(result.right.length).toBe(2)
+    expect(right(result).length).toBe(2)
   })
 
   it('should handle nested multy queries', async () => {
@@ -38,8 +41,7 @@ describe('select', () => {
       sh.select(['ul'], ['li']),
       '<ul><li>1</li><li>2</li></ul><ul><li>3</li><li>4</li></ul>'
     )()
-    if (isLeft(result)) throw result.left
-    expect(result.right.map((y) => y.map(du.textContent))).toEqual([
+    expect(right(result).map((y) => y.map(du.textContent))).toEqual([
       ['1', '2'],
       ['3', '4']
     ])
@@ -50,8 +52,7 @@ describe('select', () => {
       sh.select([sh.select('li:nth-child(1)'), sh.select('li:nth-child(2)')] as const),
       '<ul><li>1</li><li>2</li></ul><ul><li>3</li><li>4</li></ul>'
     )()
-    if (isLeft(result)) throw result.left
-    expect(result.right.map(du.textContent)).toEqual(['1', '2'])
+    expect(right(result).map(du.textContent)).toEqual(['1', '2'])
   })
 
   it('should handle struct shears', async () => {
@@ -59,9 +60,8 @@ describe('select', () => {
       sh.select({ one: sh.select('li:nth-child(1)'), two: sh.select('li:nth-child(2)') }),
       '<ul><li>1</li><li>2</li></ul><ul><li>3</li><li>4</li></ul>'
     )()
-    if (isLeft(result)) throw result.left
-    expect(du.textContent(result.right.one)).toEqual('1')
-    expect(du.textContent(result.right.two)).toEqual('2')
+    expect(du.textContent(right(result).one)).toEqual('1')
+    expect(du.textContent(right(result).two)).toEqual('2')
   })
 
   it('should handle chaining queries', async () => {
@@ -69,41 +69,61 @@ describe('select', () => {
       pipe(sh.select('h1'), sh.chain(sh.parent), sh.chain(sh.text)),
       '<div>one<h1>two</h1>three</div>'
     )()
-    if (isLeft(result)) throw result.left
-    expect(result.right).toEqual('onetwothree')
+    expect(right(result)).toEqual('onetwothree')
   })
 
   describe('Errors', () => {
     it('should show single queries in stack', async () => {
       const result = await sh.run(sh.select('div', 'h1', 'h4'), '<div>one<h1>two</h1>three</div>')()
-      if (isRight(result)) throw result
-      expect(result.left.message.split('\n')[0].trim()).toBe('Missing: div > h1 > ( h4 )')
+      if (E.isRight(result)) throw result
+      expect(result.left.message.split('\n')[0].trim()).toBe('div > h1 > Missing ( h4 )')
     })
     it('should show multi queries in stack', async () => {
       const result = await sh.run(sh.select(['div'], ['h1'], 'h4'), '<div>one<h1>two</h1>three</div>')()
-      if (isRight(result)) throw result
-      expect(result.left.message.split('\n')[0].trim()).toBe('Missing: [div] > [h1] > ( h4 )')
+      if (E.isRight(result)) throw result
+      expect(result.left.message.split('\n')[0].trim()).toBe('[div] > [h1] > Missing ( h4 )')
     })
+    it('should show multi queries in stack with attribute failure', async () => {
+      const result = await sh.run(sh.select(['div'], ['h1 | [href]']), '<div>one<h1>two</h1>three</div>')()
+      if (E.isRight(result)) throw result
+      expect(result.left.message.split('\n')[0].trim()).toBe('[div] > Missing ( h1 | [href] )')
+    })
+  })
+
+  it('should handle single string css selecter with attribute', async () => {
+    const result = await sh.run(sh.select('div > a | [href]'), html`<div><a href="foo"></a></div>`)()
+    expect(right(result)).toBe('foo')
+  })
+  it('should handle mult string css selecter with attribute', async () => {
+    const result = await sh.run(sh.select(['div'], 'a | [href]'), html`<div><a href="foo"></a></div>`)()
+    expect(right(result)).toEqual(['foo'])
   })
 })
 
 describe('selecters', () => {
+  it('should return attribute value', async () => {
+    const result = await sh.run(sh.selectOne('a | [href] '), '<div>one<a href="foo">two</a>three</div>')()
+    expect(right(result)).toBe('foo')
+  })
+
+  it('should return attribute value', async () => {
+    const result = await sh.run(sh.selectAll('a | [href] '), '<div><a href="foo">two</a></div><a href="bar">two</a>')()
+    expect(right(result)).toEqual(['foo', 'bar'])
+  })
+
   it('should return sibling nodes', async () => {
     const result = await sh.run(sh.select('h1', sh.parent), `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`)()
-    if (isLeft(result)) throw result.left
-    expect(du.isTag(result.right) && result.right.tagName).toBe('div')
+    expect((right(result) as any).tagName).toBe('div')
   })
 
   it('should return recursively concatonate all inner text nodes', async () => {
     const result = await sh.run(sh.text, `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`)()
-    if (isLeft(result)) throw result.left
-    expect(result.right).toBe('onetwothree')
+    expect(right(result)).toBe('onetwothree')
   })
 
   it('should return serialized dom nodes', async () => {
     const result = await sh.run(sh.html, `<div><h1>one</h1><h2>two</h2><h3>three</h3></div>`)()
-    if (isLeft(result)) throw result.left
-    expect(result.right).toBe('<div><h1>one</h1><h2>two</h2><h3>three</h3></div>')
+    expect(right(result)).toBe('<div><h1>one</h1><h2>two</h2><h3>three</h3></div>')
   })
 
   it('should return all node attributes', async () => {
@@ -111,8 +131,7 @@ describe('selecters', () => {
       sh.select('div', sh.attributes),
       `<div style="background:blue" role="button">click me</div>`
     )()
-    if (isLeft(result)) throw result.left
-    expect(result.right).toEqual({ style: 'background:blue', role: 'button' })
+    expect(right(result)).toEqual({ style: 'background:blue', role: 'button' })
   })
 
   it('should return style attribute', async () => {
@@ -120,8 +139,7 @@ describe('selecters', () => {
       sh.select('div', sh.attr('style')),
       `<div style="background:blue" role="button">click me</div>`
     )()
-    if (isLeft(result)) throw result.left
-    expect(result.right).toEqual('background:blue')
+    expect(right(result)).toEqual('background:blue')
   })
 })
 
@@ -131,8 +149,7 @@ describe('utilities', () => {
       sh.nullable(sh.select('h9')),
       `<div><h1>hello</h1><h2>world</h2><h2>something</h2></div>`
     )()
-    if (isLeft(result)) throw result.left
-    expect(result.right).toBe(null)
+    expect(right(result)).toBe(null)
   })
 })
 
@@ -171,9 +188,7 @@ describe('Crawling', () => {
       ),
       { connection }
     )()
-
-    if (isLeft(result)) throw result.left
-    expect(result.right).toEqual({
+    expect(right(result)).toEqual({
       title: 'Shears Test HTML',
       posts: [
         {
@@ -205,14 +220,13 @@ describe('Crawling', () => {
       goTo('/', (r) => TE.of(r)),
       { connection }
     )()
-    if (isLeft(result)) throw result.left
     expect(fn.mock.calls[0]).toEqual(['/', { hostname: 'http://helloworld.com' }])
-    expect(result.right?.connection?.ctx).toEqual({ hostname: 'http://helloworld.com' })
+    expect(right(result)?.connection?.ctx).toEqual({ hostname: 'http://helloworld.com' })
   })
 
   it('should throw error when not connection object is found', async () => {
     const result = await sh.run(goTo('/', (r) => TE.of(r)))()
-    if (isRight(result)) throw new Error('Supposed to fail')
+    if (E.isRight(result)) throw new Error('Supposed to fail')
     expect(result.left instanceof Error).toBe(true)
   })
 })

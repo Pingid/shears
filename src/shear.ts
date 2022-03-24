@@ -12,6 +12,7 @@ import * as TE from 'fp-ts/TaskEither'
 
 import { is, CountArrayDepth, ShearError, Last } from './utility'
 
+type L = CountArrayDepth<[[string]], number>
 // -------------------------------------------------------------------------------------
 // Types
 // -------------------------------------------------------------------------------------
@@ -19,8 +20,9 @@ export interface Node extends dh.Node {}
 
 export interface Context<R> {
   readonly data: R
-  readonly parser: typeof parseDocument
   readonly parallel: boolean
+
+  readonly parser: typeof parseDocument
 }
 
 export interface Shear<R, E, A> extends RTE.ReaderTaskEither<Context<R>, E, A> {}
@@ -42,6 +44,12 @@ interface Select {
    * @since 0.0.1
    */
   <E>(): Shear<Node[] | Node, E, Node[] | Node>
+  <S extends [`${string}|${string}`]>(...args: S): Shear<Node[] | Node, Error, CountArrayDepth<S, string>>
+  <S extends [...(string | [string] | Shear<Node | Node[], Error, Node>)[], `${string}|${string}`]>(...args: S): Shear<
+    Node[] | Node,
+    Error,
+    CountArrayDepth<S, string>
+  >
 
   <
     S extends [
@@ -98,20 +106,30 @@ export const select: Select = (...args: unknown[]) => {
       const [head, ...tail] = args
       if (is.string(head)) {
         const fail = { ...failure, stack: [...failure.stack, head] }
-        failure.error.message = `Missing: ${[...failure.stack].join(' > ')} > ( ${head} )`
-        const selected = pipe(cs.selectOne(head, ctx.data), fromNullable(failure.error), TE.fromEither)
+        // failure.error.message = `Missing: ${[...failure.stack].join(' > ')} > ( ${head} )`
+        const selected = pipe(
+          selectOne(head),
+          RTE.mapLeft((error) => {
+            error.message = `${[...failure.stack].join(' > ')} > ${error.message}`
+            return error
+          })
+        )
         return pipe(
-          selected,
+          selected(ctx),
           TE.chain((data) => recursiveSelect(fail, ...(tail as any))({ ...ctx, data }))
         )
       }
 
       if (is.array(head)) {
         if (is.string(head[0])) {
-          const selected = TE.right(cs.selectAll(head[0], ctx.data))
+          const selected = selectAll(head[0])(ctx)
           const fail = { ...failure, stack: [...failure.stack, `[${head}]`] }
           return pipe(
             selected,
+            TE.mapLeft((error) => {
+              error.message = `${[...failure.stack].join(' > ')} > ${error.message}`
+              return error
+            }),
             TE.chain(flow(TE.traverseArray((data) => recursiveSelect(fail, ...(tail as any))({ ...ctx, data }))))
           )
         }
@@ -235,6 +253,76 @@ export const chain: {
 // -------------------------------------------------------------------------------------
 // Node Selectors
 // -------------------------------------------------------------------------------------
+/**
+ * Select a single element or attribute
+ *
+ * @example
+ * import * as sh from 'shears';
+ *
+ * sh.selectOne('body > #content > ul') // Node
+ * sh.selectOne('body > #content > a | [href]') // string
+ *
+ * @category selector
+ * @since 0.0.1
+ */
+export const selectOne: {
+  <S extends `${string}|${string}`>(query: S): Shear<Node[] | Node, Error, string>
+  <S extends string>(query: S): Shear<Node[] | Node, Error, Node>
+} = (query: string) => (r: Context<any>) => {
+  const [qr, rest] = query.split('|')
+  const result = cs.selectOne(qr as string, r.data, {}) as Node
+  const error = new ShearError(`Missing ( ${query} )`, selectOne)
+  if (!result) return TE.left(error)
+
+  const attr = (rest || '').trim().replace(/\[|\]/gm, '')
+  if (attr) {
+    if (!(result instanceof dh.Element)) {
+      return TE.left(error)
+    }
+    const res = result.attribs[attr]
+    if (!res) return TE.left(error)
+    return TE.right(res)
+  }
+  return TE.right(result) as any
+}
+
+/**
+ * Select a single multiple elements from css query selector
+ *
+ * @example
+ * import * as sh from 'shears';
+ *
+ * sh.selectAll('body > #content > ul') // Node[]
+ * sh.selectAll('body > #content > a | [href]') // string[]
+ *
+ * @category selector
+ * @since 0.0.1
+ */
+export const selectAll: {
+  <S extends `${string}|${string}`>(query: S): Shear<Node[] | Node, Error, string[]>
+  <S extends string>(query: S): Shear<Node[] | Node, Error, Node[]>
+} = (query: string) => (r: Context<any>) => {
+  const [qr, rest] = query.split('|')
+  const result = cs.selectAll(qr as string, r.data, {})
+  const error = new ShearError(`Missing ( ${query} )`, selectAll)
+
+  const attr = (rest || '').trim().replace(/\[|\]/gm, '')
+
+  if (attr) {
+    return pipe(
+      result,
+      TE.traverseArray((x) => {
+        if (!(x instanceof dh.Element)) {
+          return TE.left(error)
+        }
+        const res = x.attribs[attr]
+        if (!res) return TE.left(error)
+        return TE.right(res)
+      })
+    )
+  }
+  return TE.right(result) as any
+}
 
 /**
  * Get the inner text content.
