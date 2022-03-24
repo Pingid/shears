@@ -42,6 +42,7 @@ interface Select {
    * @since 0.0.1
    */
   <E>(): Shear<Node[] | Node, E, Node[] | Node>
+
   <
     S extends [
       string | [string] | Shear<Node | Node[], Error, Node>,
@@ -62,7 +63,6 @@ interface Select {
   ): Shear<Node[] | Node, Error, CountArrayDepth<S, TypeOfShearReturn<Last<S>>>>
 
   // Struct Query
-
   <N extends Node[] | Node, T extends { [x: string | number]: Shear<N, Error, any> }>(struct: T): Shear<
     N,
     Error,
@@ -216,12 +216,10 @@ export const nullable: {
  * Convert a shear to accept the output of one shear
  *
  * @example
- * import { chain } from 'fp-ts/ReaderTaskEither'
  * import { pipe } from 'fp-ts/function'
  * import * as sh from 'shears'
  *
- * pipe(sh.parent, chain(chainable(sh.text)))
- * sh({ title: sh.nullable(sh('title', sh.text)) }) // { title: string | null }
+ * pipe(sh.parent, chain(sh.text))
  *
  * @category utility
  * @since 0.0.1
