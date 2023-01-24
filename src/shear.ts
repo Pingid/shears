@@ -231,6 +231,21 @@ export const nullable: {
 } = flow(RTE.altW(() => RTE.right(null)))
 
 /**
+ * Create a shear that returns a value A instead of failing
+ *
+ * @example
+ * import * as sh from 'shears'
+ *
+ * sh({ title: pipe(sh('title', sh.text), sh.getOr(null)) }) // { title: string | null }
+ *
+ * @category utility
+ * @since 0.0.1
+ */
+export const getOr: {
+  <T>(or: T): <A, B>(a: Shear<A, Error, B>) => Shear<A, Error, B | T>
+} = (or) => flow(RTE.altW(() => RTE.right(or)))
+
+/**
  * Convert a shear to accept the output of one shear
  *
  * @example
