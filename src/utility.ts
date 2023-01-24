@@ -1,3 +1,13 @@
+import * as E from '@effect-ts/core/Effect'
+
+export type Shear<R, A> = E.Effect<R, ShearError, A>
+export class ShearError extends Error {
+  constructor(m?: string, fn?: Function) {
+    super(m)
+    Error.captureStackTrace(this, fn)
+  }
+}
+
 export const is =
   <T extends any>(fn: (x: unknown) => boolean) =>
   (x: unknown): x is T =>
@@ -18,10 +28,3 @@ export type CountArrayDepth<A, B> = A extends []
     ? CountArrayDepth<R, B[]>
     : CountArrayDepth<R, B>
   : never
-
-export class ShearError extends Error {
-  constructor(m?: string, fn?: Function) {
-    super(m)
-    Error.captureStackTrace(this, fn)
-  }
-}
